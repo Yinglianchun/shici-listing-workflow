@@ -1,0 +1,103 @@
+import json
+import tempfile
+import unittest
+from pathlib import Path
+from unittest.mock import patch
+import workbench_worker as worker
+from naming import named_file,plan_file
+from excel_export import portable_excel
+from qa import build_candidates
+from test_ordering import group,equivalent
+
+class WorkflowTests(unittest.TestCase):
+    def test_full_order_pending_qa_resume_and_manual_recompose(self):
+        self.run_workflow('sorted-first')
+
+    def test_dedup_first_order_and_resume(self):
+        self.run_workflow('dedup-first')
+
+    def test_new_project_analysis_tables_and_resume(self):
+        self.run_workflow('dedup-first',modern=True)
+
+    def test_stop_after_sorting_does_not_call_product_analysis(self):
+        self.run_workflow('dedup-first',modern=True,stop_first=True)
+
+    def run_workflow(self,flow,modern=False,stop_first=False):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);incoming=root/'input';incoming.mkdir();job=root/'job';job.mkdir()
+            groups=[group('a','polarized sunglasses'),group('b','sunglasses polarized'),group('c','anti glare polarized sunglasses'),group('d','red sunglasses'),group('e','How do I clean these sunglasses?','ai_generated_question'),group('f','Do these sunglasses offer UV400?','ai_generated_question')]
+            groups.extend([group('g','Are sunglasses suitable for fishing?','ai_generated_question'),group('h','Are sunglasses suitable for fishing and golf?','ai_generated_question')])
+            sources=[{'source_id':'S'+g['group_id'],'file':'fixture.csv','csv_record':i+1,'raw':{'ASIN':'OWN','Type':g['kind'],'Keyword':g['text'],'CoreTerm':'sunglasses'}} for i,g in enumerate(groups)]
+            worker.save(incoming/'sources.json',sources);worker.save(incoming/'groups.json',groups)
+            worker.save(job/'job.json',{'workflow':flow,'export_prefix':'OWN_2026-11-15','import_folder':str(incoming),'product':{'asin':'OWN','title':'Test','facts':{'lens':'polarized, UV400, anti glare'}},'llm_model':'test/model','embedding_model':'test/embedding','max_characters':9000})
+            if modern:
+                cfg=worker.read(job/'job.json');cfg.update(excel_subdir='表格',analyze_product=True);worker.save(job/'job.json',cfg)
+            worker.save(job/'status.json',{'state':'pending','steps':[{'name':name,'state':'pending'} for name in (worker.STAGES if flow=='dedup-first' else worker.SORTED_STAGES)]})
+            calls=[];qa_ids=[]
+            def export(plans,path):
+                path=named_file(Path(path).parent,Path(path).name);path.parent.mkdir(parents=True,exist_ok=True);worker.save(plan_file(path),plans);portable_excel(plans,path);return path
+            def analyse_product(product,model,path):
+                if path.exists():return worker.read(path)
+                calls.append('product')
+                result={'product':product,'analysis':{'selling_points':[{'item':'偏光','basis':'polarized'}]}}
+                worker.save(path,result);return result
+            def embed(texts,*args,**kwargs):calls.append('embedding');return [[1.,0.] for t in texts],{}
+            def assess(items,*args,**kwargs):
+                calls.append('applicability')
+                if modern:self.assertIn('analysis',args[0])
+                return {g['group_id']:{'status':'exclude' if g['group_id']=='d' else 'pending' if g['group_id']=='e' else 'eligible','reason':'fixture','basis':'fixture'} for g in items},{}
+            def judge(pairs,groups,*args,**kwargs):
+                calls.append('dedup');index={g['group_id']:g for g in groups}
+                return [equivalent(index[p['left']],index[p['right']]) for p in pairs],{}
+            def grouped(groups,*args,**kwargs):
+                calls.append('dedup')
+                from ordering import deduplicate_similar
+                judgments=[equivalent(a,b) for a in groups for b in groups if a is not b]
+                judgments.append({'left':'g','right':'h','relation':'partial_overlap','left_unique':[],'right_unique':['golf'],'left_covers_right':False,'right_covers_left':True})
+                return deduplicate_similar(groups,judgments,{g['group_id']:{'status':'unfiltered'} for g in groups})
+            def analyse(items,*args,**kwargs):
+                calls.append('grading')
+                self.assertNotIn('d',[i['id'] for i in items]);self.assertNotIn('b',[i['id'] for i in items])
+                return {i['id']:{'core_term':'sunglasses','attributes':[],'topic':'包装保养与售后'} for i in items},{}
+            def qa_process(args,**kwargs):
+                calls.append('qa');qin=Path(args[args.index('--input')+1]);out=Path(args[args.index('--out')+1]);out.mkdir()
+                gs=worker.read(qin/'groups.json');graded=worker.read(qin/'graded_groups.json');app=worker.read(qin/'applicability.json')
+                buckets=build_candidates(gs,{g['group_id']:g['assessment'] for g in graded},sources,app)
+                original=[q for qs in buckets.values() for q in qs];qa_ids.extend(q['id'] for q in original)
+                worker.save(out/'qa_selection.json',{'qa':[],'original_questions':original})
+            def final(materials,*args,**kwargs):
+                calls.append('final')
+                self.assertTrue(all('red sunglasses' not in r['originals'] for r in materials))
+                return [{'material':r,'review':{'status':'eligible','reason':'fixture'}} for r in materials],{}
+            with patch.multiple(worker,export_excel=export,embed_texts=embed,assess=assess,judge_pairs=judge,deduplicate_groups=grouped,analyse=analyse,analyse_product=analyse_product,final_comparison=final),patch.object(worker.subprocess,'run',qa_process):
+                if stop_first:
+                    worker.run(job,2)
+                    self.assertEqual(calls,['embedding'])
+                    self.assertFalse((job/'product_analysis.json').exists())
+                worker.run(job,9)
+                expected=['embedding','product','dedup','applicability','grading','qa','final'] if stop_first else (['product'] if modern else [])+(['embedding','dedup','applicability','grading','qa','final'] if flow=='dedup-first' else ['embedding','applicability','dedup','grading','qa','final'])
+                self.assertEqual(calls,expected)
+                self.assertCountEqual(qa_ids,['e','f','g','h'])
+                if flow=='dedup-first':
+                    graded={g['group_id']:g['assessment'] for g in worker.read(job/'stage5.json')}
+                    self.assertIsNone(graded['g']['level'])
+                    self.assertEqual(graded['h']['level'],0)
+                    self.assertEqual(worker.read(job/'stage4.json')['g']['status'],'pending')
+                self.assertEqual(worker.read(job/('stage3.json' if flow=='dedup-first' else 'stage4.json'))['representatives']['b'],'a')
+                self.assertIn('c',worker.read(job/('stage3.json' if flow=='dedup-first' else 'stage4.json'))['kept_ids'])
+                tables=list(job.rglob('*.xlsx'));tables=[p for p in tables if '使用的Skill' not in p.parts]
+                self.assertEqual(len(tables),12 if modern else 11)
+                self.assertTrue(all(p.name.startswith('OWN_2026-11-15_') for p in tables))
+                if modern:
+                    self.assertFalse(list(job.glob('*.xlsx')))
+                    self.assertFalse(list((job/'表格').glob('*.json')))
+                    self.assertTrue(all(s['file'].startswith('表格/') for s in worker.read(job/'status.json')['steps']))
+                    self.assertIn('analysis',worker.read(job/'product.json'))
+                self.assertEqual(worker.read(job/'status.json')['state'],'completed')
+                worker.run(job,6);self.assertEqual(len(calls),7 if modern else 6)
+                reviews=worker.read(job/'stage7.json');mid=next(r['material']['material_id'] for r in reviews if r['material']['kind']=='keyword')
+                worker.save(job/'review_decisions.json',{mid:{'status':'exclude','reason':'manual'}})
+                worker.run(job,9,compose_only=True);self.assertEqual(len(calls),7 if modern else 6)
+                self.assertNotIn(mid,[r['material_id'] for r in worker.read(job/'stage8.json')['advertising_keywords']])
+
+if __name__=='__main__':unittest.main()

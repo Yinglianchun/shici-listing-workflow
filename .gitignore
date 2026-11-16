@@ -1,0 +1,23 @@
+node_modules/
+output/
+outputs/
+__pycache__/
+.playwright-mcp/
+工作区/
+八面马拓展词/
+products/
+Refine Minimal Onboarding Design/
+/*.xlsx
+*.zip
+*.sqlite3
+*.db
+*.log
+*.inspect.ndjson
+*.plan.json
+.env
+.env.*
+workbench-settings.json
+/tools/*.py
+!/tools/build-share-packages.py
+!/tools/build-stage-templates.py
+!/tools/verify-share-package.py

@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>语义关系复核 · Listing 工作台</title>
+<style>
+:root{font:15px/1.6 system-ui,"Microsoft YaHei",sans-serif;color:#25343b;background:#f4f5f1;--accent:#16665d}
+*{box-sizing:border-box}body{margin:0}main{max-width:1180px;margin:auto;padding:32px 24px 64px}h1{font-size:28px;margin:0}h2{font-size:16px;margin:0 0 8px}p{margin:6px 0}header{display:flex;justify-content:space-between;gap:20px;align-items:center;margin-bottom:22px}.muted{color:#667475;font-size:13px}button,select,input{font:inherit;border:1px solid #bac6c3;border-radius:6px;background:white;padding:8px 12px;color:inherit}button{cursor:pointer}button.primary{background:var(--accent);color:white;border-color:var(--accent)}button:disabled{opacity:.4;cursor:default}button:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid #82c7ba;outline-offset:2px}.controls{display:flex;gap:10px;flex-wrap:wrap;margin:18px 0 10px;align-items:center}.controls input{flex:1;min-width:230px}.count{margin-bottom:16px}.pair{background:white;border:1px solid #d4dcd7;border-radius:9px;margin:16px 0;padding:20px}.pair-top{display:flex;justify-content:space-between;gap:14px;align-items:center;margin-bottom:14px}.badge{display:inline-block;background:#e8efeb;color:#265b50;border-radius:4px;padding:3px 8px;font-size:12px}.flag{background:#fff1cd;color:#775516;border-radius:5px;padding:9px 12px;margin:12px 0;font-size:13px}.columns{display:grid;grid-template-columns:1fr 1fr;gap:22px}.question{font-size:17px;line-height:1.55;margin:4px 0 12px;white-space:pre-wrap;overflow-wrap:anywhere}.unique{font-size:14px;color:#44575a;margin-top:8px}.evidence{font-size:13px;color:#687773;border-left:2px solid #cddcd4;padding-left:10px;white-space:pre-wrap}.reason{border-top:1px solid #e4e8e3;margin-top:16px;padding-top:12px;font-size:14px}.actions{display:flex;gap:9px;flex-wrap:wrap;align-items:center;margin-top:15px}.pager{display:flex;justify-content:center;align-items:center;gap:15px;margin:24px 0}.empty{text-align:center;padding:60px;color:#667475}.saved{color:var(--accent);font-size:13px}.source{overflow-wrap:anywhere}label{font-size:13px}.screen-reader{position:absolute;left:-10000px}summary{cursor:pointer}.cover{font-size:13px;margin-top:8px;color:#667475}@media(max-width:680px){main{padding:20px 14px}header{display:block}header button{margin-top:12px}.columns{grid-template-columns:1fr}.pair{padding:16px}.pair-top{align-items:start}h1{font-size:24px}}
+</style></head><body><main>
+<header><div><h1>语义关系复核</h1><p class="muted">看重合，也看每句话多问了什么。</p></div><div><button id="import">导入确认记录</button> <button id="download" class="primary">导出已确认关系</button><input type="file" id="import-file" accept="application/json,.json" hidden></div></header>
+<p id="summary" class="muted"></p><p class="muted source" id="source"></p>
+<div class="controls">
+<label for="relation">关系</label><select id="relation"><option value="all">全部关系</option><option value="equivalent">同义重复候选</option><option value="partial_overlap">部分重合</option><option value="same_topic">仅同主题</option><option value="different">不同意图</option><option value="uncertain">不确定</option><option value="unjudged">判断失败</option></select>
+<label for="state">进度</label><select id="state"><option value="all">全部进度</option><option value="pending">未确认</option><option value="confirmed">已确认</option><option value="flagged">有复核提示</option></select>
+<label class="screen-reader" for="search">搜索问句或词</label><input id="search" placeholder="搜索问句、关键词、主题或判断理由">
+</div>
+<p id="count" class="muted count" aria-live="polite"></p><div id="pairs"></div><div class="pager"><button id="previous">上一页</button><span id="page"></span><button id="next">下一页</button></div>
+<p id="storage" class="muted">确认仅记录这对文本的关系；原问与来源始终保留。请导出确认记录以便保存。</p>
+</main><script type="application/json" id="data">__REVIEW_DATA__</script><script>
+const data=JSON.parse(document.getElementById('data').textContent);
+const labels={equivalent:'同义重复候选',partial_overlap:'部分重合',same_topic:'仅同主题',different:'不同意图',uncertain:'不确定',unjudged:'判断失败'};
+const storageKey='listing-review:'+data.source;
+const keyOf=row=>row.left+'\t'+row.right;
+let decisions={};try{decisions=JSON.parse(localStorage.getItem(storageKey)||'{}')}catch{document.getElementById('storage').textContent='浏览器未提供本地保存，请通过导出确认记录保存进度。'}
+for(const [key,value] of Object.entries(decisions)){const row=data.rows.find(r=>keyOf(r)===key);if(!row||!value||!Object.hasOwn(labels,value.relation)||value.relation==='unjudged'||value.left_text!==row.left_text||value.right_text!==row.right_text)delete decisions[key]}
+for(const row of data.rows){if(row.status==='confirmed'&&row.reviewed_relation&&!decisions[keyOf(row)])decisions[keyOf(row)]={left:row.left,right:row.right,left_text:row.left_text,right_text:row.right_text,relation:row.reviewed_relation,reviewed_at:row.reviewed_at}}
+let page=0;const pageSize=12;
+const el=(tag,text,className)=>{const node=document.createElement(tag);if(text!==undefined)node.textContent=text;if(className)node.className=className;return node};
+const getDecision=row=>decisions[keyOf(row)];
+function save(){try{localStorage.setItem(storageKey,JSON.stringify(decisions))}catch{document.getElementById('storage').textContent='本地保存不可用，请导出确认记录保存进度。'}}
+function render(){
+ const relation=document.getElementById('relation').value,state=document.getElementById('state').value,query=document.getElementById('search').value.toLowerCase().trim();
+ const rows=data.rows.filter(row=>(relation==='all'||row.relation===relation)&&(state==='all'||state==='pending'&&!getDecision(row)||state==='confirmed'&&getDecision(row)||state==='flagged'&&row.review_flags?.length)&&(!query||[row.left_text,row.right_text,row.reason,...(row.topics||[])].join(' ').toLowerCase().includes(query)));
+ const totalPages=Math.max(1,Math.ceil(rows.length/pageSize));page=Math.max(0,Math.min(page,totalPages-1));
+ const progress=data.summary.preview?`处理中预览：已完成 ${data.rows.length} / ${data.summary.candidate_total} 对`:`${data.rows.length} 对候选`;
+ document.getElementById('summary').textContent=`${progress} · ${data.summary.model||''} · 关系是模型建议，商品适用性另行核对`;
+ document.getElementById('source').textContent='同义：信息相同；部分重合：保留新增条件；仅同主题：分别保留购买关注点。';
+ document.getElementById('count').textContent=`当前筛选 ${rows.length} 对；已确认 ${Object.keys(decisions).length} 对`;
+ const container=document.getElementById('pairs');container.replaceChildren();
+ if(!rows.length)container.append(el('div','没有符合筛选条件的候选。','empty'));
+ for(const row of rows.slice(page*pageSize,(page+1)*pageSize)){
+  const card=el('article',undefined,'pair');card.dataset.left=row.left;card.dataset.right=row.right;
+  const top=el('div',undefined,'pair-top');top.append(el('span',labels[row.relation]||row.relation,'badge'),el('span',`${row.left} ↔ ${row.right} · 相似度 ${row.score}`,'muted'));card.append(top);
+  const columns=el('div',undefined,'columns');
+  for(const [side,title] of [['left','左侧原文'],['right','右侧原文']]){
+   const column=el('section');column.append(el('h2',title),el('p',row[side+'_text'],'question'));
+   column.append(el('p','独有信息：'+((row[side+'_unique']||[]).join('；')||'模型未列出'),'unique'));
+   if(row[side+'_evidence']?.length)column.append(el('p','原文依据：'+row[side+'_evidence'].join(' / '),'evidence'));
+   if(row[side+'_provenance']?.length){const details=el('details'),summary=el('summary',`来源 ${row[side+'_provenance'].length} 条`,'muted');details.append(summary);
+    for(const source of row[side+'_provenance']){details.append(el('p',`${source.source_type==='ai_generated_question'?'AI生成问句':'关键词'} · ${source.marketplace} ${source.asin} · ${source.file} · 第${source.record}条记录`,'muted'));if(source.imported_evidence)details.append(el('p','导出文件所列依据：'+source.imported_evidence,'evidence'))}
+    column.append(details);
+   }
+   columns.append(column);
+  }card.append(columns);
+  if(row.review_flags?.length)card.append(el('div',row.review_flags.join('；'),'flag'));
+  card.append(el('p',row.error||row.reason||'尚未判断','reason'));
+  if(row.shared_intent)card.append(el('p','共同意图：'+row.shared_intent,'muted'));
+  if(row.can_share_answer!==undefined)card.append(el('p',`${row.coverage_method?'按差异列表推导：':''}左覆盖右：${row.left_covers_right?'是':'否'}；右覆盖左：${row.right_covers_left?'是':'否'}；可共用具体短答案：${row.can_share_answer?'可能':'不建议'}`,'cover'));
+  const actions=el('div',undefined,'actions'),select=el('select');select.setAttribute('aria-label',`确认 ${row.left} 与 ${row.right} 的关系`);
+  for(const value of ['equivalent','partial_overlap','same_topic','different','uncertain']){const option=el('option',labels[value]);option.value=value;select.append(option)}
+  select.value=getDecision(row)?.relation||(['unjudged'].includes(row.relation)?'uncertain':row.relation);
+  const confirm=el('button','确认这条关系','primary');confirm.onclick=()=>{decisions[keyOf(row)]={left:row.left,right:row.right,left_text:row.left_text,right_text:row.right_text,relation:select.value,reviewed_at:new Date().toISOString()};save();render()};
+  const undo=el('button','撤销确认');undo.disabled=!getDecision(row);undo.onclick=()=>{delete decisions[keyOf(row)];save();render()};
+  actions.append(select,confirm,undo,el('span',getDecision(row)?'已确认：'+labels[getDecision(row).relation]:'尚未确认',getDecision(row)?'saved':'muted'));card.append(actions);container.append(card);
+ }
+ document.getElementById('page').textContent=`${page+1} / ${totalPages}`;document.getElementById('previous').disabled=page===0;document.getElementById('next').disabled=page>=totalPages-1;
+}
+for(const id of ['relation','state'])document.getElementById(id).onchange=()=>{page=0;render()};
+document.getElementById('search').oninput=()=>{page=0;render()};
+document.getElementById('previous').onclick=()=>{page--;render();scrollTo(0,0)};document.getElementById('next').onclick=()=>{page++;render();scrollTo(0,0)};
+document.getElementById('download').onclick=()=>{const content={source:data.source,exported_at:new Date().toISOString(),decisions:Object.values(decisions)};const url=URL.createObjectURL(new Blob([JSON.stringify(content,null,2)],{type:'application/json'}));const link=el('a');link.href=url;link.download='关系确认记录.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000)};
+document.getElementById('import').onclick=()=>document.getElementById('import-file').click();
+document.getElementById('import-file').onchange=async event=>{
+ const file=event.target.files[0];if(!file)return;
+ try{const imported=JSON.parse(await file.text());if(!Array.isArray(imported.decisions))throw new Error('没有确认记录');let count=0,skipped=0;
+  for(const record of imported.decisions){const row=record&&data.rows.find(r=>r.left===record.left&&r.right===record.right);if(row&&Object.hasOwn(labels,record.relation)&&record.relation!=='unjudged'&&row.left_text===record.left_text&&row.right_text===record.right_text){decisions[keyOf(row)]=record;count++}else skipped++}
+  save();render();document.getElementById('storage').textContent=`已导入 ${count} 条确认记录；${skipped} 条与当前数据不符，未导入。`;
+ }catch{document.getElementById('storage').textContent='无法读取确认记录，请选择此前导出的 JSON 文件。'}
+ event.target.value='';
+};
+render();
+</script></body></html>

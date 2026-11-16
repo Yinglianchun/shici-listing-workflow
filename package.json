@@ -1,0 +1,7 @@
+{
+  "name": "listing-workbench",
+  "private": true,
+  "type": "module",
+  "scripts": {"capture": "node capture.mjs", "capture:batch": "node capture-batch.mjs", "test:capture": "node --test capture.test.mjs capture-batch.test.mjs", "test:review": "node --test review.test.mjs"},
+  "dependencies": {"playwright-core": "1.65.0"}
+}

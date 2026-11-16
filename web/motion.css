@@ -1,0 +1,25 @@
+:root{--task-ease:cubic-bezier(.23,1,.32,1);--task-morph:cubic-bezier(.77,0,.175,1)}
+.run-status{max-width:680px;margin:0 auto 26px;color:#666;font-size:12px}
+.run-status>summary{display:flex;align-items:center;gap:10px;list-style:none;cursor:pointer;min-height:30px}
+.run-status>summary::-webkit-details-marker{display:none}
+.run-status-label{color:#666}.run-status-count,.run-status-time{font-size:10px;color:#999}
+.run-status-time{margin-left:auto;font-variant-numeric:tabular-nums}
+.run-status-list{list-style:none;padding:12px 0 0 26px;margin:0;display:grid;gap:13px}
+.run-status-list li{display:flex;align-items:center;gap:10px;font-size:11px}
+.run-status-list small{margin-left:auto;font-size:10px;color:#aaa}
+.status-symbol{display:inline-flex;width:18px;height:18px;flex:0 0 18px;color:#333}
+.status-symbol svg{display:block;width:100%;height:100%;overflow:visible}
+.status-ring{transform-origin:12px 12px;stroke-dasharray:1.8 5.3;opacity:.4;transition:stroke-dasharray 300ms var(--task-morph),opacity 300ms var(--task-ease)}
+.status-check,.status-cross{stroke-dasharray:1;stroke-dashoffset:1;opacity:0;transition:stroke-dashoffset 240ms var(--task-ease),opacity 180ms var(--task-ease)}
+.status-symbol[data-state=running] .status-ring{stroke-dasharray:38 19;opacity:1;animation:status-spin 1100ms linear infinite}
+.status-symbol[data-state=done] .status-ring,.status-symbol[data-state=failed] .status-ring{stroke-dasharray:57 0;opacity:.2}
+.status-symbol[data-state=done] .status-check,.status-symbol[data-state=failed] .status-cross{stroke-dashoffset:0;opacity:1}
+.status-symbol[data-state=pending]{color:#aaa}.status-symbol[data-state=cancelled]{color:#999}
+.status-symbol[data-state=running]+.run-status-label{animation:status-breathe 1600ms var(--task-morph) infinite}
+.request-working{display:inline-flex!important;align-items:center;justify-content:center;gap:8px}
+.request-working::before{content:"";width:10px;height:10px;flex:0 0 10px;border:1.5px solid currentColor;border-right-color:transparent;border-radius:50%;animation:status-spin 1100ms linear infinite}
+.step-dots button,.step-dots i{transition-timing-function:var(--task-ease)}
+.motion-outgoing{pointer-events:none!important;user-select:none;z-index:1}
+@keyframes status-spin{to{transform:rotate(360deg)}}
+@keyframes status-breathe{0%,100%{opacity:.6}50%{opacity:1}}
+@media(prefers-reduced-motion:reduce){.status-symbol *,.run-status-label,.request-working::before{animation:none!important;transition:none!important}.step-dots button{transition:none!important}}
