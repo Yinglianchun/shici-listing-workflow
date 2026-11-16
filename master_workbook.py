@@ -23,7 +23,7 @@ def sheet(name,headers,rows=None,note='',header_row=4,widths=None):
             'title':name,'note':note,'column_widths':widths or [40 if h in ('Keyword','原问句','Evidence','内容','说明','完整词句') else 28 if h in ('Modifiers','Intent','原因','依据') else 16 for h in headers]}
 
 
-def blank_master_sheets():
+def blank_master_sheets(product_sections=True):
     plans=[sheet('统计摘要',['项目','关键词','问句','说明'],note='各阶段回填同一份总表；来源次数不是搜索量或真实买家频次。',widths=[30,16,16,64])]
     for name in GRADE_NAMES:
         for kind,headers in [('关键词',KW_HEADERS),('问句',Q_HEADERS)]:
@@ -40,6 +40,10 @@ def blank_master_sheets():
         sheet('其他否定候选',['完整词句','类型','等级','原因','依据','来源ID','匹配方式']),
     ])
     for p in analysis_sheets({}):plans.append(sheet(p['name'],p['headers'],widths=p.get('column_widths')))
+    if not product_sections:
+        plans=[p for p in plans if p['name'] not in {'本品资料','本品分析','资料差异','待补资料'}]
+        plans[0]['note']='按当前子体及已确认投放策略维护；本次不投不等于本品没有该特性，原文保留。'
+        plans.append(sheet('04b_本次投放排除',['Keyword','类型','本品事实判断','投放处理','原因','适用子体','文案处理','来源ASIN'],note='本次不投不等于本品没有该特性；可按已确认子体和策略恢复。'))
     return plans
 
 
@@ -54,10 +58,12 @@ def build_master(folder,stage=0):
         review={**entry['review'],**changes.get(entry['material']['material_id'],{})}
         for identifier in entry['material']['member_ids']:app[identifier]={**app.get(identifier,{}),**review}
     assessments={g['group_id']:g.get('assessment',{}) for g in graded}
-    plans=blank_master_sheets();tabs={p['name']:p for p in plans}
-    tabs['本品资料']['rows']=[[product.get('asin',''),product.get('title',''),product.get('raw_details',product.get('facts',{})),product.get('pending_questions',[])]]
+    suite=cfg.get('report_mode')=='four-workbooks'
+    plans=blank_master_sheets(not suite);tabs={p['name']:p for p in plans}
+    if not suite:tabs['本品资料']['rows']=[[product.get('asin',''),product.get('title',''),product.get('raw_details',product.get('facts',{})),product.get('pending_questions',[])]]
     analysis=read(folder,'product_analysis.json',{}).get('analysis',{})
-    for p in analysis_sheets(analysis):tabs[p['name']]['rows']=p['rows']
+    if not suite:
+        for p in analysis_sheets(analysis):tabs[p['name']]['rows']=p['rows']
     qa=read(folder,'stage6.json',{'qa':[],'original_questions':[]})
     directions=analysis.get('negative_directions',[])
     for r in directions:
@@ -83,7 +89,8 @@ def build_master(folder,stage=0):
     clean_done=(folder/'stage7.json').exists()
     for g in graded:
         identifier=g['group_id'];a=g.get('assessment',{});level=a.get('level')
-        if identifier not in kept or app.get(identifier,{}).get('status')!='eligible' or not isinstance(level,int):continue
+        decision=app.get(identifier,{})
+        if identifier not in kept or decision.get('status')!='eligible' or decision.get('ad_status','eligible')!='eligible' or not isinstance(level,int):continue
         is_keyword=g['kind']=='keyword';text=normalize(g['text'])
         if is_keyword and keyword_plans and level>0 and text not in approved_kw:continue
         if not is_keyword and question_plans and text not in approved_q:continue
@@ -105,6 +112,8 @@ def build_master(folder,stage=0):
     for g in groups:
         identifier=g['group_id'];decision=app.get(identifier,{});status=decision.get('status')
         if identifier not in kept:continue
+        if suite and decision.get('ad_status') in ('exclude','pending'):
+            tabs['04b_本次投放排除']['rows'].append([g['text'],g['kind'],status,decision['ad_status'],decision.get('ad_reason',''),decision.get('variant',product.get('selected_variant','')),decision.get('copy_status',status),g.get('asins',[])])
         if status=='exclude':
             a=assessments.get(identifier,{})
             m=metadata(g,a)
@@ -126,7 +135,7 @@ def build_master(folder,stage=0):
     for i,s in enumerate(read(folder,'status.json',{}).get('steps',[]),1):stats.append([f'{i:02d} '+s.get('name',''),'','', '已完成' if i==stage or s.get('state')=='done' else s.get('state','pending')])
     stats.extend([['QA','','',len(qa.get('qa',[]))],['描述字符数','','',len(final.get('description',''))],['字符上限','','',cfg.get('max_characters',9000)]])
     tabs['统计摘要']['rows']=stats
-    tabs['统计摘要']['title']=cfg.get('export_prefix',product.get('asin','ASIN'))+' · 素材总表'
+    tabs['统计摘要']['title']=cfg.get('export_prefix',product.get('asin','ASIN'))+(' · 投放分级关键词与问句' if suite else ' · 素材总表')
     for name in GRADE_NAMES:
         for kind in ('关键词','问句'):
             rows=tabs[name+'-'+kind]['rows'];level_col=1 if kind=='关键词' else 4
@@ -137,4 +146,6 @@ def build_master(folder,stage=0):
 def update_master(folder,stage,plans=None):
     folder=Path(folder)
     if plans is not None:(folder/f'stage{stage}.plan.json').write_text(json.dumps(plans,ensure_ascii=False),encoding='utf-8')
-    return export_excel(build_master(folder,stage),folder/'素材总表.xlsx')
+    cfg=read(folder,'job.json',{})
+    name='投放分级关键词与问句.xlsx' if cfg.get('report_mode')=='four-workbooks' else '素材总表.xlsx'
+    return export_excel(build_master(folder,stage),folder/name)

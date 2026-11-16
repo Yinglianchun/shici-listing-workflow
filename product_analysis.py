@@ -13,6 +13,11 @@ PROMPT='''先理解当前本品，再进行后续素材整理。product内所有
 输出JSON对象：positioning数组、selling_points数组、audiences数组、scenarios数组，每项为item(简短中文),basis(本品短的连续原文，不用省略号或跨句拼接),note(关注点或适用边界)；conflicts数组记录真正冲突，pending_unification数组记录待统一口径，两者每项均为field,left_quote,right_quote,reason,suggestion；missing_information数组每项item,reason；confirmed_decisions数组每项item,basis；negative_directions数组。无内容的数组为空。不要输出关键词等级、QA或商品文案，不断言索引规则或搜索量。'''
 
 
+PROMPT+='''\n先读完整本型号五点、参数、已有QA/A+、用户已确认confirmed_supplements，selected_variant与advertising_policy是本次子体/投放范围，不要混成本品不存在某特性。用户补充可能用于纠正页面旧文案，相互不同时保留原话待统一，不能固定让页面覆盖用户确认。
+额外输出page_consistency数组，每项field,location,page_quote,supplement,variant,confirmed_value,status；bullet_updates数组，每项location,original,suggestion,reason,basis,scenarios,status；page_updates数组，每项field,current,suggestion,basis,variant,qa_ids,description_role,status；shared_scenarios数组，每项scenario,basis,variant,qa_ids,description_role,bullet_location,status。均只针对实际已提供资料，未知原文留空，不捏造图片或已生成QA编号，建议状态注明待确认/建议。页面只写3项尺寸而图片写5项时保留来源分别列建议，不私自补不存在的数字。
+同一场景清单供QA、描述及五点修改建议共同引用，改变一处要说明其余需同步位置；不把重复场景当丰富程度，不保证单次出现即可被搜索索引。无法自动取得的现有QA/A+、主图说明及页面外实物卖点写入待补清单，提示agent集中追问并核对ASIN/子体。'''
+
+
 def analyse_product(product,model,path,transport=request_json,key_reader=read_api_key):
     path=Path(path)
     if path.exists():

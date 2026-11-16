@@ -82,7 +82,7 @@ def public_job(identifier,stage=None,search=''):
     result={'id':identifier,'title':cfg['product']['title'],'asin':cfg['product']['asin'],'created':cfg['created'],
         'report_mode':cfg.get('report_mode','stage-files'),
         'llm_model':cfg['llm_model'],'embedding_model':cfg['embedding_model'],'status':status,'until':cfg.get('until',9),'workspace':str(folder.resolve()),'export_prefix':cfg.get('export_prefix',''),
-        'files':[p.relative_to(folder).as_posix() for base in [folder,folder/'表格'] if base.exists() for p in base.iterdir() if p.is_file() and p.suffix in (('.xlsx','.docx') if cfg.get('report_mode')=='single-workbook' else ('.xlsx','.csv','.txt'))],
+        'files':[p.relative_to(folder).as_posix() for base in [folder,folder/'表格'] if base.exists() for p in base.iterdir() if p.is_file() and p.suffix in (('.xlsx','.docx') if cfg.get('report_mode') in ('single-workbook','four-workbooks') else ('.xlsx','.csv','.txt'))],
         'preview':[]}
     log_path=folder/'process.log'
     if status.get('state')=='running' and log_path.exists():
@@ -222,13 +222,14 @@ class Handler(BaseHTTPRequestHandler):
                 product={'asin':p['asin'].strip().upper(),'marketplace':'US','title':p.get('title',''),
                     'raw_details':p['details'],'facts':{'用户提供的完整详情':p['details']},'source_type':'manual',
                     'core_candidates':[s.strip() for s in p.get('core_terms','').split(',') if s.strip()],
-                    'pending_questions':[s for s in p.get('pending','').splitlines() if s.strip()]}
+                    'pending_questions':[s for s in p.get('pending','').splitlines() if s.strip()],
+                    'confirmed_supplements':p.get('confirmed_supplements',''),'selected_variant':p.get('selected_variant',''),'advertising_policy':p.get('advertising_policy',''),'excluded_brands':[s.strip() for s in p.get('excluded_brands','').splitlines() if s.strip()]}
                 if p.get('capture_source'):
                     product['captured_listing']=p['capture_source'];product['source_type']='listing_claim_with_user_details'
                 cfg={'id':identifier,'export_prefix':prefix(product['asin'],date),'created':time.strftime('%Y-%m-%d %H:%M'),'inputs':files,'product':product,'test':data.get('test') is True,
                     'llm_model':data.get('llm_model') or SETTINGS['llm_model'],'embedding_model':data.get('embedding_model') or SETTINGS['embedding_model'],
                     'max_characters':max(1,min(int(data.get('max_characters',9000)),50000)),'workflow':'dedup-first',
-                    'excel_subdir':'表格','analyze_product':True,'report_mode':'single-workbook','dynamic_qa_topics':True,
+                    'excel_subdir':'表格','analyze_product':True,'report_mode':'four-workbooks','dynamic_qa_topics':True,
                     'fixed_negative_phrases':[s.strip() for s in p.get('negative_phrases','').splitlines() if s.strip()],
                     'topics':[s.strip() for s in p.get('topics','').splitlines() if s.strip()],'until':int(data.get('until',1))}
                 save(folder/'job.json',cfg);save(folder/'status.json',{'state':'pending','steps':[{'name':s,'state':'pending'} for s in STAGES]})

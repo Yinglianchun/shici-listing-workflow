@@ -21,3 +21,5 @@ workbench-settings.json
 !/tools/build-share-packages.py
 !/tools/build-stage-templates.py
 !/tools/verify-share-package.py
+!/tools/build-preprocess-package.py
+!/tools/verify-preprocess-package.py

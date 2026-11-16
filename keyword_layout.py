@@ -2,6 +2,7 @@
 from collections import Counter,defaultdict
 from cleaner import normalize
 import re
+from ad_policy import matched_brand
 
 CORE_HEADERS=['核心泛词','词池中裸词出现','归入该核心泛词的词量','旧等级(裸词)','处置建议']
 TERM_HEADERS=['序号','关键词','核心泛词','属性数','属性明细','处置建议']
@@ -27,7 +28,7 @@ def empty_template():
     return [sheet(TABS[0],CORE_HEADERS,[]),*[sheet(name,TERM_HEADERS,[]) for name in TABS[1:5]]]
 
 def keyword_sheets(graded,groups,sources,app,representatives,product):
-    kept=sorted([g for g in graded if g['kind']=='keyword' and app.get(g['group_id'],{}).get('status')=='eligible' and isinstance(g['assessment'].get('level'),int) and representatives.get(g['group_id'],g['group_id'])==g['group_id']],key=lambda g:(g['assessment']['level'],g['text'].casefold()))
+    kept=sorted([g for g in graded if g['kind']=='keyword' and app.get(g['group_id'],{}).get('status')=='eligible' and app.get(g['group_id'],{}).get('ad_status','eligible')=='eligible' and isinstance(g['assessment'].get('level'),int) and representatives.get(g['group_id'],g['group_id'])==g['group_id']],key=lambda g:(g['assessment']['level'],g['text'].casefold()))
     seen=set();unique=[]
     for g in kept:
         key=keyword_identity(g['text'])
@@ -38,6 +39,7 @@ def keyword_sheets(graded,groups,sources,app,representatives,product):
         return ', '.join(dict.fromkeys(str(source_map[i]['raw'].get('Level','')) for i in g['sources'] if i in source_map and source_map[i]['raw'].get('Level') not in (None,'')))
     counts=Counter(normalize(g['assessment'].get('core_term') or '') for g in kept if g['assessment'].get('level') is not None)
     cores=list(dict.fromkeys(normalize(c) for c in [*product.get('core_candidates',[]),*counts] if c))
+    cores=[c for c in cores if not matched_brand(c,product.get('excluded_brands',[]))]
     core_rows=[]
     for core in cores:
         if not core:continue

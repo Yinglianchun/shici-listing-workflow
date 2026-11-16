@@ -51,5 +51,16 @@ class QaDeliveryTests(unittest.TestCase):
         self.assertEqual(tabs['备选原问']['rows'][0][0],'a')
         self.assertEqual(len(tabs['完整原问池']['rows']),2)
 
+    def test_excluded_brand_draft_is_archived_not_used_as_buyer_answer(self):
+        draft={'qa_id':'a','topic':'fit','question_en':'Are ViewJoy glasses small?','answer_en':'A draft.'}
+        with tempfile.TemporaryDirectory() as d:
+            result=curate({'qa':[draft]},{'excluded_brands':['ViewJoy']},'test',Path(d)/'selection.json',lambda *a:({'main_ids':['a'],'aplus_ids':['a']},{}),lambda:'test')
+        self.assertEqual(result['qa'],[])
+        self.assertEqual(result['aplus_qa'],[])
+        self.assertEqual(result['candidate_qa'][0]['question_en'],draft['question_en'])
+        self.assertEqual(len(result['excluded_qa']),1)
+        tabs={s['name']:s for s in delivery_sheets(result)}
+        self.assertIn('已排除QA留档',tabs)
+
 
 if __name__=='__main__':unittest.main()

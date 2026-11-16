@@ -30,7 +30,14 @@ GENERAL_PROMPT='''对照product的完整商品资料，判断每条AI生成关�
 保养条件也须逐字对照：清水或fresh water不能自动扩展成温水、热水或洗涤剂；品牌通用FAQ的防刮、抗冲击等技术不能直接当成本型号已确认的属性，除非本型号资料另有明确支持。
 用途按语义而非逐字匹配：已列travel和seaside trips可以支持beach vacation这种同义场景，但不能由此增加防水等性能。核心商品叫法中的night vision glasses与原文明问good for night vision use须区分；列出夜驾用途不能单独证明增强夜视能力，有歧义时pending。
 输出JSON对象results数组，每个输入ID对应一条，不改原文，不写答案。'''
-FINAL_PROMPT=GENERAL_PROMPT+'''\n这是分级、清洗后，组合描述之前的第二次对照自查。尤其检查清洗是否丢失否定、数字、条件或关系，以及合并是否混入本品没有的属性。只依据当前product完整资料，不依据上一阶段eligible标签。返回同样的results格式。'''
+GENERAL_PROMPT+='''\n分别判断本品事实、当前子体和本次投放：status仍只表示本品事实适用性，另返回ad_status、copy_status（eligible/exclude/pending）、ad_reason和variant。ad_status依据product.advertising_policy及selected_variant，copy_status依据已确认特性和文案用途；本品有某特性不等于本次要投这个词，投放排除也不等于文案必须删除。没有单独策略时，不替用户编造投放取舍或“多数买家想要什么”的数据结论。不自动把本次不投改为否定词。
+先读完全部本品五点、参数、已有QA/A+及confirmed_supplements。页面旧文案与用户新确认冲突时列待确认，不固定让旧页面覆盖补充。品牌通用介绍和AI拓词不能覆盖本型号依据。
+核对颜色修饰对象：Gold/Black可能是金框加黑镜片，不等于黑框；black lenses与black frame分别判断，black oval sunglasses这种未说明部件的词按已确认主推策略处理，策略未给时pending，不自行判黑框。按当前子体排除后保留原文和子体原因，不能扩成全店不适用。
+尺寸要区分镜宽、总框宽、镜高、鼻梁宽、镜腿长和脸宽，并核对单位；明确相同部件尺寸不符才exclude，不因看到不同数字就删掉比较或适配问题，未知公差不编造。
+anti-glare、TAC和polarized不是可以直接互换的同义词；只按本品资料确认各自属性。用户可能因投放策略排除anti-glare/TAC，但明确已有特性可继续用于文案；非偏光本身不够推导不具备anti-glare或镜片材质。兼具不支持属性的完整短语不能因一部分匹配就放行。
+别人品牌名按本次策略判断：未授权竞品品牌投放时从正向投放及文案排除整条，保留原文用于留档，不能只剥掉品牌把剩余句子当本品原句。关键词和问句、大小写及已确认的品牌写法都要检查；未经确认不把普通形容词误判品牌。
+用途包括功能活动和穿搭、派对、购物、社交、拍照，不因不是驾驶/徒步而忽略。'''
+FINAL_PROMPT=GENERAL_PROMPT+'''\n这是分级、清洗后，组合描述之前的第二次对照自查。status在本次表示文案可用性，不因仅本次不投就排除已确认的描述素材；ad_status仍单独按投放策略返回。尤其检查清洗是否丢失否定、数字、条件或关系，以及合并是否混入本品没有的属性。只依据当前product完整资料，不依据上一阶段eligible标签。返回同样的results格式。'''
 
 
 def assess(groups, product, cache_path, batch_size=24, workers=6,model=DEFAULT_MODEL,final=False):

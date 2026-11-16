@@ -12,7 +12,7 @@ def screened_sheets(groups,app):
     return [sheet('可用素材',['原文ID','类型','完整原文','来源ID'],[[g['group_id'],g['kind'],g['text'],g['sources']] for g in good])]
 
 def question_grade_sheets(graded,app,roots):
-    good=sorted([g for g in graded if g['kind']=='ai_generated_question' and app.get(g['group_id'],{}).get('status')=='eligible'
+    good=sorted([g for g in graded if g['kind']=='ai_generated_question' and app.get(g['group_id'],{}).get('status')=='eligible' and app.get(g['group_id'],{}).get('ad_status','eligible')=='eligible'
         and roots.get(g['group_id'],g['group_id'])==g['group_id'] and isinstance(g['assessment'].get('level'),int)],
         key=lambda g:(g['assessment']['level'],g['text'].casefold()))
     plans=[]

@@ -4,9 +4,11 @@ from pathlib import Path
 from judge import request_json
 from semantic import read_api_key
 from output_plans import qa_sheets, sheet
+from ad_policy import matched_brand
 
 PROMPT='''为本品QA交付做选题排序并完成一次答案定稿。输入candidate_qa来自实际原问，不是商品事实。每条answer_characters和aplus_characters是程序真实统计的英文字符数，不是模型估计，不含中文。
 QA、备选QA、A+及中文译文均站在卖家角度直接回答自家商品，可用our/我们的或以产品为主语，不用the listing says、described as、according to the product page、listed weight等第三方转述。出处放basis，不塞进买家答案；不无端追加“不能消除路面反光”等未经本品资料支持或无关的负面结论。问题确实询问边界/比较时按已确认内容如实回答，不隐瞒、不夸大。
+本品问题和回答不含他牌名，品牌原文仍留在来源记录；投放策略排除不等于QA/文案不能谈论本品已确认特性。场景按product.analysis.shared_scenarios核对，关联五点建议及描述口径，不因重复出现而断言索引或真实需求。
 main_ids优先选择10个有价值、方向互补且本品有依据的QA；同一方向只选一条，不为凑10条重复选题。支持不足或不足10个时少选，缺资料问题保留备选。
 眼镜候选若涉及汗液腐蚀、长期佩戴/皮肤接触过敏、涂层或抗刮，优先选1—2个有价值的问题，近义内容可合于同一问题，其余留备选；按本品确认的部件和子体回答，不由防腐推出不过敏或由抗刮推出绝不刮花。不按AI原问数量断言真实需求高低。
 aplus_ids另选2—3个适合A+详细解释的问答，优先互补、值得展开的功能/适配/使用关注点，可与主QA重合；不足时少选。
@@ -43,10 +45,13 @@ def curate(result,product,model,path,transport=request_json,key_reader=read_api_
         current={**q,**fields}
         current.update(answer_characters=len(current.get('answer_en','')),aplus_characters=len(current.get('aplus_answer_en','')))
         return current
+    final_main=[finalized(q) for q in main];final_reserve=[finalized(q) for q in candidates if q['qa_id'] not in chosen];final_aplus=[finalized(q) for q in aplus]
+    def brand_in(q):return matched_brand(' '.join(q.get(k,'') for k in ('question_en','question_zh','answer_en','answer_zh','aplus_answer_en','aplus_answer_zh')),product.get('excluded_brands',[]))
+    excluded={q['qa_id']:{**q,'exclusion_reason':'含用户确认排除的他牌：'+str(brand_in(q))} for q in [*final_main,*final_reserve,*final_aplus] if brand_in(q)}
     # Keep every original draft and its lineage, even when it is not in the main ten.
-    return {**result,'candidate_qa':candidates,'qa':[finalized(q) for q in main],
-            'reserve_qa':[finalized(q) for q in candidates if q['qa_id'] not in chosen],
-            'aplus_qa':[finalized(q) for q in aplus],'selection_reason':selection.get('reason','')}
+    return {**result,'candidate_qa':candidates,'qa':[q for q in final_main if q['qa_id'] not in excluded],
+            'reserve_qa':[q for q in final_reserve if q['qa_id'] not in excluded],
+            'aplus_qa':[q for q in final_aplus if q['qa_id'] not in excluded],'excluded_qa':list(excluded.values()),'selection_reason':selection.get('reason','')}
 
 
 def delivery_sheets(result):
@@ -61,9 +66,16 @@ def delivery_sheets(result):
         [q['id'],q.get('topic',''),q['text'],q.get('asins',[]),q.get('selection',[])]
         for q in result.get('original_questions',[]) if q['id'] not in covered
         and q.get('applicability',{}).get('status')!='exclude'
+        and q.get('applicability',{}).get('copy_status')!='exclude'
         and not any(d.get('status')=='不适用建议' for d in q.get('selection',[]))])
     plans[2]=qa_sheets({**result,'qa':[*main,*backup]})[2]
-    return [plans[0],reserve,unused,plans[1],*plans[2:]]
+    extras=[]
+    if result.get('excluded_qa'):
+        excluded=qa_sheets({'qa':result['excluded_qa']})[0];excluded['name']='已排除QA留档'
+        excluded['headers'].append('排除原因')
+        for row,q in zip(excluded['rows'],result['excluded_qa']):row.append(q.get('exclusion_reason',''))
+        extras.append(excluded)
+    return [plans[0],reserve,unused,plans[1],*plans[2:],*extras]
 
 
 def export_qa(result,folder):

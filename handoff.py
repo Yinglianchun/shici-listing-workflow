@@ -35,6 +35,7 @@ TASKS={
 def write_handoff(folder):
     folder=Path(folder).resolve()
     cfg=json.loads((folder/'job.json').read_text(encoding='utf-8'))
+    if cfg.get('report_mode')=='four-workbooks':return write_four_handoff(folder,cfg)
     single=cfg.get('report_mode')=='single-workbook'
     product_file=named_file(folder,'素材总表.xlsx' if single else '00_本品资料.xlsx').relative_to(folder).as_posix()
     qa_file=named_file(folder,'QA与A+问答.xlsx').relative_to(folder).as_posix()
@@ -129,4 +130,33 @@ def write_handoff(folder):
     lines.append('关键词、AI生成问句和中间结果不是官方资料或真实买家提问。不能拿竞品属性补本品卖点。')
     prompt='\n\n'.join(lines)+'\n'
     target=named_file(folder,'接下来怎么做.txt');target.write_text(prompt,encoding='utf-8')
+    return {'folder':str(folder),'file':target.name,'completed':completed,'next_stage':next_stage if next_stage<=9 else None,'prompt':prompt}
+
+
+def write_four_handoff(folder,cfg):
+    source=Path(__file__).parent/'skills/listing-material-workflow'
+    shutil.copytree(source,folder/'使用的Skill/listing-material-workflow',dirs_exist_ok=True)
+    status=json.loads((folder/'status.json').read_text(encoding='utf-8'))
+    completed=[]
+    for i,step in enumerate(status['steps'],1):
+        if step['state']!='done':break
+        completed.append(i)
+    next_stage=len(completed)+1
+    product=cfg['product']
+    analysis_file=folder/'product_analysis.json'
+    if analysis_file.exists():product={**product,'analysis':json.loads(analysis_file.read_text(encoding='utf-8')).get('analysis',{})}
+    (folder/'product.json').write_text(json.dumps(product,ensure_ascii=False,indent=2),encoding='utf-8')
+    outputs=[named_file(folder,name).relative_to(folder).as_posix() for name in ['本品资料与页面改动建议.xlsx','QA与A+问答.xlsx','投放分级关键词与问句.xlsx','描述素材.xlsx']]
+    lines=[f'请由当前agent直接使用 listing-material-workflow Skill 接着处理：{folder}',
+        '先读使用的Skill/listing-material-workflow/SKILL.md及references/stages.md、references/applicability-and-advertising.md，再读product.json及现有四份Excel；有人工续做/续做记录.md时优先按它的最新进度，不重做已完成部分。',
+        '当前agent自己阅读、判断和写作，不运行本地语义工作流脚本，不调用其他LLM API代跑；文件工具只辅助读写、排序、基础统计和保存Excel。',
+        '最终仅四份Excel：'+'、'.join(outputs)+'。过程CSV、JSON、模型原稿和来源保留；手工续做写人工续做/表格，更新续做记录。',
+        '先读全本品五点、参数、已有QA/A+及用户确认补充，主动追问缺少的页面外实物信息、主推ASIN/子体与本次投放策略。页面旧文案与用户补充分别留来源，冲突先问当前口径。',
+        '本品事实、子体适用性、正向投放、文案和否定分别判断；本次不投不等于本品没有。当前用户要求排除他牌词时，不能自行作为竞品词投放或自动否定；品牌原文仍留档。颜色须分框与片、尺寸须分部件/单位，含糊项先问。',
+        'QA、备选QA、A+和译文均站在卖家角度直接回答，不用the listing says、described as等第三方口吻。主QA目标10条、备选及2—3条A+，英文分别尽量240—250/480—500字符，不造内容凑满。',
+        '页面与补充口径、五点修改建议、需同步的页面字段、共用场景清单写本品资料表；QA、描述和五点建议同步场景。AI拓词不是实际需求或搜索量，不承诺单次出现即可索引。',
+        '描述以00定位与卖点为框架，按短语在描述中的作用组织，不平均配额，不漏掉穿搭/派对/购物/社交用途；半角分号连接一段，字符上限'+str(cfg.get('max_characters',9000))+'，不凑满、不截断。']
+    if next_stage<=9:lines.append(f'本次只做 {next_stage:02d} {NEW_STAGE_NAMES[next_stage-1]}，完成后先停下。已有stageN.json和input原始CSV可读作对应阶段完整资料；进入03前若缺00分析先补齐。')
+    else:lines.append('程序阶段已完成，继续人工核对四份Excel及本次策略，保存修改与来源，不自动发布。')
+    prompt='\n\n'.join(lines)+'\n';target=named_file(folder,'接下来怎么做.txt');target.write_text(prompt,encoding='utf-8')
     return {'folder':str(folder),'file':target.name,'completed':completed,'next_stage':next_stage if next_stage<=9 else None,'prompt':prompt}

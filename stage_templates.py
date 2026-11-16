@@ -8,9 +8,13 @@ def empty(plans):return [{**p,'rows':[],'template_rows':4} for p in plans]
 def templates():
     from master_workbook import blank_master_sheets
     from qa_delivery import delivery_sheets
+    from product_workbook import product_sheets
     final={'advertising_keywords':[],'prefix_groups':[],'description':'','description_selection':[],'description_limit':9000}
     return {
       '素材总表空模板.xlsx':blank_master_sheets(),
+      '投放分级关键词与问句空模板.xlsx':blank_master_sheets(False),
+      '本品资料与页面改动建议空模板.xlsx':empty(product_sheets()),
+      '描述素材空模板.xlsx':empty(description_sheets(final)),
       'QA与A+问答空模板.xlsx':empty(delivery_sheets({'qa':[],'original_questions':[]})),
       '00_本品分析.xlsx':empty(analysis_sheets({})),
       '00_本品资料.xlsx':[blank('本品完整资料',['ASIN','标题','完整详情','待确认事项','资料来源'])],

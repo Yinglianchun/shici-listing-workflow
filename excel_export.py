@@ -18,7 +18,7 @@ FIELD_NAMES={'concept':'属性类别','values':'取值','labels':'属性名称',
 VALUE_NAMES={'eligible':'可用','pending':'待补资料','exclude':'不适用','variant_only':'仅其他已确认子体',
     'equivalent':'同义重复','partial_overlap':'部分重合','same_topic':'仅同主题','different':'不同',
     'uncertain':'不确定','unjudged':'尚未判断','keyword':'关键词','ai_generated_question':'AI生成问句'}
-ENUM_HEADERS={'建议','自查建议','复核建议','原模型建议','模型原建议','采用建议','关系','关系建议','本品适用性','类型','选题状态'}
+ENUM_HEADERS={'建议','自查建议','复核建议','原模型建议','模型原建议','采用建议','关系','关系建议','本品适用性','类型','选题状态','本品事实判断','投放处理','文案处理'}
 
 
 def readable(value):

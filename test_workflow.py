@@ -25,7 +25,11 @@ class WorkflowTests(unittest.TestCase):
     def test_single_workbook_dynamic_topics_and_word_resume(self):
         self.run_workflow('dedup-first',modern=True,single=True)
 
-    def run_workflow(self,flow,modern=False,stop_first=False,single=False):
+    def test_four_excel_reports_and_ad_only_exclusion_keep_description_material(self):
+        self.run_workflow('dedup-first',modern=True,suite=True)
+
+    def run_workflow(self,flow,modern=False,stop_first=False,single=False,suite=False):
+        single=single or suite
         with tempfile.TemporaryDirectory() as directory:
             root=Path(directory);incoming=root/'input';incoming.mkdir();job=root/'job';job.mkdir()
             groups=[group('a','polarized sunglasses'),group('b','sunglasses polarized'),group('c','anti glare polarized sunglasses'),group('d','red sunglasses'),group('e','How do I clean these sunglasses?','ai_generated_question'),group('f','Do these sunglasses offer UV400?','ai_generated_question')]
@@ -36,7 +40,7 @@ class WorkflowTests(unittest.TestCase):
             if modern:
                 cfg=worker.read(job/'job.json');cfg.update(excel_subdir='表格',analyze_product=True);worker.save(job/'job.json',cfg)
                 if single:
-                    cfg.update(report_mode='single-workbook',dynamic_qa_topics=True);worker.save(job/'job.json',cfg)
+                    cfg.update(report_mode='four-workbooks' if suite else 'single-workbook',dynamic_qa_topics=True);worker.save(job/'job.json',cfg)
             worker.save(job/'status.json',{'state':'pending','steps':[{'name':name,'state':'pending'} for name in (worker.STAGES if flow=='dedup-first' else worker.SORTED_STAGES)]})
             calls=[];qa_ids=[]
             def export(plans,path):
@@ -54,7 +58,7 @@ class WorkflowTests(unittest.TestCase):
             def assess(items,*args,**kwargs):
                 calls.append('applicability')
                 if modern:self.assertIn('analysis',args[0])
-                return {g['group_id']:{'status':'exclude' if g['group_id']=='d' else 'pending' if g['group_id']=='e' else 'eligible','reason':'fixture','basis':'fixture'} for g in items},{}
+                return {g['group_id']:{'status':'exclude' if g['group_id']=='d' else 'pending' if g['group_id']=='e' else 'eligible','reason':'fixture','basis':'fixture',**({'ad_status':'exclude','ad_reason':'campaign choice','copy_status':'eligible'} if suite and g['group_id']=='c' else {})} for g in items},{}
             def judge(pairs,groups,*args,**kwargs):
                 calls.append('dedup');index={g['group_id']:g for g in groups}
                 return [equivalent(index[p['left']],index[p['right']]) for p in pairs],{}
@@ -81,7 +85,7 @@ class WorkflowTests(unittest.TestCase):
                 self.assertTrue(all('red sunglasses' not in r['originals'] for r in materials))
                 return [{'material':r,'review':{'status':'eligible','reason':'fixture'}} for r in materials],{}
             from qa_delivery import delivery_sheets
-            with patch.multiple(worker,export_excel=export,export_qa=lambda result,folder:export(delivery_sheets(result),Path(folder)/'QA与A+问答.xlsx'),embed_texts=embed,assess=assess,judge_pairs=judge,deduplicate_groups=grouped,analyse=analyse,analyse_product=analyse_product,discover_topics=discover_topics,final_comparison=final),patch.object(worker.subprocess,'run',qa_process),patch('master_workbook.export_excel',export):
+            with patch.multiple(worker,export_excel=export,export_qa=lambda result,folder:export(delivery_sheets(result),Path(folder)/'QA与A+问答.xlsx'),embed_texts=embed,assess=assess,judge_pairs=judge,deduplicate_groups=grouped,analyse=analyse,analyse_product=analyse_product,discover_topics=discover_topics,final_comparison=final),patch.object(worker.subprocess,'run',qa_process),patch('master_workbook.export_excel',export),patch('product_workbook.export_excel',export):
                 if stop_first:
                     worker.run(job,2)
                     self.assertEqual(calls,['embedding'])
@@ -99,7 +103,7 @@ class WorkflowTests(unittest.TestCase):
                 self.assertEqual(worker.read(job/('stage3.json' if flow=='dedup-first' else 'stage4.json'))['representatives']['b'],'a')
                 self.assertIn('c',worker.read(job/('stage3.json' if flow=='dedup-first' else 'stage4.json'))['kept_ids'])
                 tables=list(job.rglob('*.xlsx'));tables=[p for p in tables if '使用的Skill' not in p.parts]
-                self.assertEqual(len(tables),2 if single else 12 if modern else 11)
+                self.assertEqual(len(tables),4 if suite else 2 if single else 12 if modern else 11)
                 self.assertTrue(all(p.name.startswith('OWN_2026-11-15_') for p in tables))
                 if modern:
                     self.assertFalse(list(job.glob('*.xlsx')))
@@ -108,8 +112,13 @@ class WorkflowTests(unittest.TestCase):
                     self.assertIn('analysis',worker.read(job/'product.json'))
                 self.assertEqual(worker.read(job/'status.json')['state'],'completed')
                 if single:
-                    self.assertEqual(len(list(job.glob('*.docx'))),1)
-                    self.assertEqual(len({s['file'] for s in worker.read(job/'status.json')['steps']}),2)
+                    self.assertEqual(len(list(job.glob('*.docx'))),0 if suite else 1)
+                    self.assertEqual(len({s['file'] for s in worker.read(job/'status.json')['steps']}),3 if suite else 2)
+                if suite:
+                    reviews=worker.read(job/'stage7.json')
+                    c=next(r for r in reviews if 'c' in r['material']['member_ids'])
+                    self.assertEqual(c['review']['status'],'eligible')
+                    self.assertNotIn(c['material']['material_id'],[r['material_id'] for r in worker.read(job/'stage8.json')['advertising_keywords']])
                 worker.run(job,6);self.assertEqual(len(calls),len(expected))
                 reviews=worker.read(job/'stage7.json');mid=next(r['material']['material_id'] for r in reviews if r['material']['kind']=='keyword')
                 worker.save(job/'review_decisions.json',{mid:{'status':'exclude','reason':'manual'}})
