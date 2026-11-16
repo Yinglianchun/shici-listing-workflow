@@ -2,10 +2,24 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
-from handoff import write_handoff,STAGE_NAMES,INPUT_STAGES
+from handoff import write_handoff,STAGE_NAMES,INPUT_STAGES,NEW_STAGE_NAMES
 
 
 class HandoffTests(unittest.TestCase):
+    def test_single_report_handoff_does_not_request_old_outputs_or_fixed_topics(self):
+        with tempfile.TemporaryDirectory() as directory:
+            folder=Path(directory)
+            (folder/'job.json').write_text(json.dumps({'workflow':'dedup-first','report_mode':'single-workbook','product':{'asin':'OWN'},'max_characters':9000}),encoding='utf-8')
+            for completed in (4,5,7,8):
+                steps=[{'name':name,'state':'done' if i<completed else 'pending',**({'file':'表格/OWN_素材总表.xlsx'} if i<completed else {})} for i,name in enumerate(NEW_STAGE_NAMES)]
+                (folder/'status.json').write_text(json.dumps({'steps':steps}),encoding='utf-8')
+                result=write_handoff(folder)
+                self.assertNotIn('7—8个方向',result['prompt'])
+                self.assertNotIn('关键词分级空模板.xlsx',result['prompt'])
+                self.assertNotIn('另存采用明细和TXT',result['prompt'])
+                self.assertIn('同一份总表',result['prompt'])
+                self.assertTrue((folder/'使用的Skill/listing-material-workflow/references/stage-files-legacy.md').is_file())
+
     def test_pending_representatives_and_deleted_originals_are_separate(self):
         from handoff import NEW_STAGE_NAMES
         with tempfile.TemporaryDirectory() as directory:

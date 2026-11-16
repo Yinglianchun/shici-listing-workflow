@@ -46,8 +46,10 @@ fishing、driving、computer work等用途是属性；eye strain等功能目标�
 仍然只根据原文，不推断商品具备功能。'''
 
 
-def prompt_for(item):
-    return QUESTION_PROMPT if item.get('kind')=='ai_generated_question' else PROMPT
+def prompt_for(item,topics=None):
+    prompt=QUESTION_PROMPT if item.get('kind')=='ai_generated_question' else PROMPT
+    if topics:prompt+='\n本项目实际提问方向如下，topic必须从这里选择，覆盖前文的固定主题示例：'+json.dumps(topics,ensure_ascii=False)
+    return prompt
 
 ALIASES={'uv400':'uv_protection','ultraviolet_protection':'uv_protection',
          'polarized':'polarization','polarisation':'polarization',
@@ -197,11 +199,11 @@ def compute_level(assessment,kind,question_policy='attributes-only',activity_pol
 
 
 def analyse(items,cache_path,model=DEFAULT_MODEL,batch_size=10,workers=2,
-            transport=None,key_reader=read_api_key,progress=lambda message:None,prompt_override=None):
+            transport=None,key_reader=read_api_key,progress=lambda message:None,prompt_override=None,topics=None):
     if not 1<=batch_size<=20 or not 1<=workers<=6:
         raise ValueError('属性分析批大小需为1到20，并行数为1到6')
     if transport is None:
-        transport=lambda batch,chosen,key:request_json(batch,chosen,key,prompt_override or prompt_for(batch[0]))
+        transport=lambda batch,chosen,key:request_json(batch,chosen,key,prompt_override or prompt_for(batch[0],topics))
     cache_path=Path(cache_path);cache_path.parent.mkdir(parents=True,exist_ok=True)
     results={};pending=[]
     stats={'model':model,'items':len(items),'cache_hits':0,'failed_items':0,'requests':0,'total_tokens':0}
@@ -210,7 +212,7 @@ def analyse(items,cache_path,model=DEFAULT_MODEL,batch_size=10,workers=2,
     with closing(sqlite3.connect(cache_path)) as db:
         db.execute('CREATE TABLE IF NOT EXISTS assessments (model TEXT,prompt TEXT,input TEXT,result TEXT,PRIMARY KEY(model,prompt,input))')
         for item in items:
-            cached=db.execute('SELECT result FROM assessments WHERE model=? AND prompt=? AND input=?',(model,prompt_override or prompt_for(item),context(item))).fetchone()
+            cached=db.execute('SELECT result FROM assessments WHERE model=? AND prompt=? AND input=?',(model,prompt_override or prompt_for(item,topics),context(item))).fetchone()
             if cached:
                 row=json.loads(cached[0]);row['id']=item['id']
                 results[item['id']]=normalize_assessment(row,item)
@@ -249,7 +251,7 @@ def analyse(items,cache_path,model=DEFAULT_MODEL,batch_size=10,workers=2,
                 for item in futures[future]:
                     if item['id'] in accepted:
                         raw,normalized=accepted[item['id']];results[item['id']]=normalized
-                        db.execute('INSERT OR REPLACE INTO assessments VALUES (?,?,?,?)',(model,prompt_override or prompt_for(item),context(item),json.dumps(raw,ensure_ascii=False)))
+                        db.execute('INSERT OR REPLACE INTO assessments VALUES (?,?,?,?)',(model,prompt_override or prompt_for(item,topics),context(item),json.dumps(raw,ensure_ascii=False)))
                     else:
                         results[item['id']]={'id':item['id'],**failures[item['id']]};stats['failed_items']+=1
                 db.commit()

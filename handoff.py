@@ -35,9 +35,10 @@ TASKS={
 def write_handoff(folder):
     folder=Path(folder).resolve()
     cfg=json.loads((folder/'job.json').read_text(encoding='utf-8'))
-    product_file=named_file(folder,'00_本品资料.xlsx').relative_to(folder).as_posix()
+    single=cfg.get('report_mode')=='single-workbook'
+    product_file=named_file(folder,'素材总表.xlsx' if single else '00_本品资料.xlsx').relative_to(folder).as_posix()
     ad_file=named_file(folder,'08_广告关键词.csv' if cfg.get('export_prefix') else '广告关键词.csv').name
-    description_file=named_file(folder,'09_商品描述素材草稿.txt' if cfg.get('export_prefix') else '商品描述素材草稿.txt').name
+    description_file=named_file(folder,'商品描述素材.docx' if single else '09_商品描述素材草稿.txt' if cfg.get('export_prefix') else '商品描述素材草稿.txt').name
     status=json.loads((folder/'status.json').read_text(encoding='utf-8'))
     modern=cfg.get('workflow') in ('sorted-first','dedup-first')
     new_order=cfg.get('workflow')=='dedup-first'
@@ -46,6 +47,13 @@ def write_handoff(folder):
     tasks=TASKS if modern else LEGACY_TASKS
     if new_order:
         tasks={**TASKS,3:'只依据原始A列Keyword文本判断重复，不读旧Level/CoreTerm/Modifiers/Intent/Evidence；Type只用于分流，原文ID用于返回保留/删除映射，后续再重新整理与分级。按完整相似组去重，重复表达只留一条。通用规则：同一提问方向下，X问题完整包含Y问题的全部信息时，保留X、剔除Y；各有独有信息都保留。不改写或合并问题，不因同主题或共用答案删除。广告关键词新增限定继续保留。300条是装批目标，不能切断相似组；原文留在来源记录。',4:LEGACY_TASKS[5]+'只筛03留下的素材；剔除原问仍供独立QA参考，未单独筛选的原问标待确认。',6:LEGACY_TASKS[3]+'读取01完整原问与03删除映射，结合04适用性和05方向；问题完整包含关系不能直接沿用较长问题的属性等级。',7:TASKS[7].replace('第04步','第03步').replace('03结论','04结论')}
+    if single:
+        tasks={**tasks,
+            5:'根据本次完整原问归纳提问方向，不固定分类数量；关键词和问句分别重新按独立语义限定分级，更新总表的0-1、2、3、4级及以上分表。当前属性、核心词和方向重新判断，旧Level、Evidence仅供追溯。此时问句A列留空，完整原问另列。',
+            6:'读取01完整原问与03删除映射，结合04适用性及05方向；每个实际方向只选一个聚焦问题并全面回答，不固定方向数量，清洁可独立成类。QA英文最多250字符、A+500字符，中文译文另列，显示实际长度。缺依据不编答案，结果更新总表QA、A+及原问关联区域。',
+            7:'清洗问句的提问结构、助动词、普通介词和代商品代词，保留否定、数值及必要关系。清洗后重新对照完整本品，排除不可用项，更新总表等级页；不另出复核表。广告词保留完整，QA用过的问句也不能绕过清洗。',
+            8:'更新总表广告和否定候选：0/1级为精准否定候选；固定词组单列已确认，模型建议另标。待确认不自动转否定，small、polarized依本品与已确认子体判断。完整广告词保留，共同前缀仅压缩描述，不另交CSV。',
+            9:'用最终可用的清洗短语组合描述，分号连接一段，不凑字数、不截断完整素材，遵守本次字符上限。总表记录长度，另存真实Word，最终只交同一份总表Excel和Word描述素材。'}
     completed=[]
     for i,step in enumerate(status['steps'],1):
         if step['state']!='done':break
@@ -54,7 +62,7 @@ def write_handoff(folder):
     skill=folder/'使用的Skill/listing-material-workflow'
     source=Path(__file__).parent/'skills/listing-material-workflow'
     excluded={'03_本品适用性筛选.xlsx','04_高重合素材去重.xlsx'} if new_order else {'03_高重合素材去重.xlsx','04_本品适用性筛选.xlsx'}
-    files=['SKILL.md','references/stages.md','references/templates.md','references/product-analysis.md']+[p.relative_to(source).as_posix() for p in sorted((source/'assets').glob('*.xlsx')) if p.name not in excluded]
+    files=['SKILL.md','references/stages.md','references/templates.md','references/product-analysis.md','references/stage-files-legacy.md']+[p.relative_to(source).as_posix() for p in sorted((source/'assets').glob('*.xlsx')) if (p.name=='素材总表空模板.xlsx' if single else p.name not in excluded)]
     for name in files:
         target=skill/name;target.parent.mkdir(parents=True,exist_ok=True)
         source_name=name
@@ -78,7 +86,7 @@ def write_handoff(folder):
         '若“人工续做/续做记录.md”已存在，先读它及记录指向的新产物；以下进度只代表程序结果，已人工完成的阶段不要重做，改为继续记录中的下一阶段。']
     if analysis_file.exists():
         lines.append('先读 product_analysis.json 的本品定位、卖点、原文依据、资料差异和待补项，再核对完整资料；分析不覆盖原文或用户已确认决定。')
-        analysis_table=named_file(folder,'00_本品分析.xlsx')
+        analysis_table=named_file(folder,'素材总表.xlsx' if single else '00_本品分析.xlsx')
         if analysis_table.exists():lines.append('本品分析表：'+analysis_table.relative_to(folder).as_posix())
     elif new_order:
         lines.append('进入AI去重、筛选或选QA前，先按Skill补做00本品分析：提炼定位、卖点、人群和场景；冲突引用两段原文，缺失资料单列。将Excel保存到人工续做/表格，保留完整原文；已知部分可继续，不把缺资料当成商品没有。')
@@ -94,25 +102,27 @@ def write_handoff(folder):
         deleted_pending=[i for i,r in app.items() if i not in kept and r.get('status')=='pending']
         lines.append(f'筛选交接：可用代表{len(eligible)}条（关键词{kinds["keyword"]}、问句{kinds["ai_generated_question"]}）；待确认代表{len(pending)}条；另有{len(deleted_pending)}条去重剔除但留档的待确认原文，不能把它们重复计入待确认代表。')
         lines.append(f'适用性Excel只列可用代表，未列出的内容不等于已丢失。读取{app_file.name}的状态及原因、{dedup_file.name}的保留映射，再读stage1.json完整原文；待确认问句仍可选QA，但不得编写肯定答案，待确认素材不进入正式广告和描述。')
-    done_files=[s['file'] for s in status['steps'] if s['state']=='done' and s.get('file')]
+    done_files=list(dict.fromkeys(s['file'] for s in status['steps'] if s['state']=='done' and s.get('file')))
     lines.append('已完成：'+('、'.join(done_files) if done_files else '暂无完整阶段；原始CSV已保存在input。'))
     if next_stage<=9:
         lines.append(f'下一步只做 {next_stage:02d} {names[next_stage-1]}，完成后先停下。')
         dependencies=inputs[next_stage]
-        required=[status['steps'][i-1]['file'] for i in dependencies if status['steps'][i-1].get('file')]
+        required=list(dict.fromkeys(status['steps'][i-1]['file'] for i in dependencies if status['steps'][i-1].get('file')))
         question_details=named_file(folder,'05_问句与分级明细.xlsx')
         if next_stage>=6 and question_details.exists():required.append(question_details.relative_to(folder).as_posix())
         lines.append('本阶段接着读取：'+('、'.join(required) if required else 'input文件夹内的原始CSV。'))
         lines.append('需要完整来源或表格中较长内容时，可对应读取stageN.json；不要只依赖聊天中的摘要。')
         if (folder/'review_decisions.json').exists():lines.append('同时读取 review_decisions.json，保留人工修改及模型原建议。')
         lines.append('具体任务：'+tasks[next_stage])
+        if single:lines.append('本项目采用总表模式：使用assets/素材总表空模板.xlsx的分表和列结构，每完成一个阶段就回填同一份总表，不新建阶段Excel。A列Keyword按本项目清洗规则生成，完整原问另列，旧等级与Evidence只作来源记录，不作为去重/分级依据。QA方向按这批原问归纳，清洁可独立成类；0/1级为精准否定候选，词组否定按本品与子体提出，不照搬其他款的small或polarized。')
         if next_stage==9:lines.append(f'本次描述字符上限：{cfg["max_characters"]}，不是要凑满的目标。')
-        output_name=named_file(folder,f'{next_stage:02d}_{names[next_stage-1]}.xlsx').name
-        lines.append(f'将真实Excel保存到本项目文件夹的“人工续做/表格/{output_name}”，辅助CSV/TXT放在人工续做目录，保留程序原产物。')
-        lines.append('每阶段必须实际保存Excel：第1行直接表头，不冻结，表头行高16.5、正文默认14，需要两行时28，按随附模板使用蓝底白字表头、宋体正文、灰白隔行和紧凑列宽；保留原文ID和来源。')
+        output_name=named_file(folder,'素材总表.xlsx' if single else f'{next_stage:02d}_{names[next_stage-1]}.xlsx').name
+        lines.append(f'将真实Excel保存到本项目文件夹的“人工续做/表格/{output_name}”，保留程序原产物。' if single else f'将真实Excel保存到本项目文件夹的“人工续做/表格/{output_name}”，辅助CSV/TXT放在人工续做目录，保留程序原产物。')
+        lines.append('每阶段实际更新保存同一份Excel，保留模板分表、标题和表头位置，不冻结；正文14或28，保留完整原问与来源。' if single else '每阶段必须实际保存Excel：第1行直接表头，不冻结，表头行高16.5、正文默认14，需要两行时28，按随附模板使用蓝底白字表头、宋体正文、灰白隔行和紧凑列宽；保留原文ID和来源。')
+        if single and next_stage==9:lines.append(f'将分号连接的描述整理成真实Word：人工续做/{description_file}，9000按英文字符上限处理，不强行填满。最终交付仅总表Excel和Word，过程JSON留在项目内，不另交阶段CSV或TXT。')
         lines.append('完成后更新“人工续做/续做记录.md”：本次完成阶段、产物路径、待补问题、下一阶段、先读哪些文件，并给出下一步可复制提示词。后续优先使用人工续做里的新产物，不重复旧阶段。')
     else:
-        lines.append(f'00—09程序阶段已完成。接下来核对07自查、{ad_file}和{description_file}；需要人工修改时另存“人工续做”，保留来源与修改理由，不自动发布。')
+        lines.append(f'程序阶段已完成。最终交付：{product_file}、{description_file}；如需人工修改，在人工续做目录继续更新一份总表和Word。' if single else f'00—09程序阶段已完成。接下来核对07自查、{ad_file}和{description_file}；需要人工修改时另存“人工续做”，保留来源与修改理由，不自动发布。')
     lines.append('关键词、AI生成问句和中间结果不是官方资料或真实买家提问。不能拿竞品属性补本品卖点。')
     prompt='\n\n'.join(lines)+'\n'
     target=named_file(folder,'接下来怎么做.txt');target.write_text(prompt,encoding='utf-8')

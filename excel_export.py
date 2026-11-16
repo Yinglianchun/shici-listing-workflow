@@ -69,7 +69,7 @@ def presentation_sheets(sheets,translate=True):
             if attribute is not None:values.insert(attribute+1,attribute_evidence(row[attribute]))
             rows.append(values)
         if attribute is not None:headers.insert(attribute+1,'属性原文依据')
-        if s.get('layout')!='keyword_reference':headers=[compact_header(h) for h in headers]
+        if s.get('layout') not in ('keyword_reference','master_reference'):headers=[compact_header(h) for h in headers]
         level_column=next((i for i,h in enumerate(headers) if h in ('等级','属性数')),None)
         if level_column is not None:
             rows.sort(key=lambda row:row[level_column] if isinstance(row[level_column],(int,float)) else 999)
@@ -87,7 +87,7 @@ def presentation_sheets(sheets,translate=True):
         for n,prefix in enumerate(['一级','二级','三级','四级'],1):
             if name.startswith(prefix):return n
         return 999
-    return sorted(output,key=sheet_level)
+    return output if any(s.get('layout')=='master_reference' for s in output) else sorted(output,key=sheet_level)
 
 
 def portable_excel(sheets,path):
@@ -110,22 +110,25 @@ def portable_excel(sheets,path):
         book=[];rels=[]
         for index,sheet in enumerate(sheets,1):
             data=sheet['rows'] or [[None]*len(sheet['headers']) for _ in range(sheet.get('template_rows',0))]
-            matrix=[sheet['headers'],*data];cols=len(sheet['headers'])
+            header_row=sheet.get('header_row',1)
+            preamble=[[sheet.get('title','')],[sheet.get('note','')]] if header_row>1 else []
+            preamble=(preamble+[[] for _ in range(header_row)])[:header_row-1]
+            matrix=[*preamble,sheet['headers'],*data];cols=len(sheet['headers'])
             widths=sheet['column_widths']
             rows=[]
             for r,row in enumerate(matrix,1):
                 cells=[]
                 for c,value in enumerate(row,1):
-                    ref=f'{col(c)}{r}';style='1' if r==1 else '2' if r%2==0 else '0'
+                    ref=f'{col(c)}{r}';style='1' if r==header_row else '2' if r%2==0 else '0'
                     if isinstance(value,(int,float)) and not isinstance(value,bool) and math.isfinite(value):
                         cells.append(f'<c r="{ref}" s="{style}"><v>{value}</v></c>')
                     else:
                         value=''.join(ch for ch in text(value) if ord(ch)>=32 or ch in '\t\n\r')
                         cells.append(f'<c r="{ref}" s="{style}" t="inlineStr"><is><t xml:space="preserve">{escape(value)}</t></is></c>')
-                height=16.5 if r==1 else body_row_height(row,widths)
-                if r>1 and sheet.get('layout')=='description':height=max(14,math.ceil(len(text(row[0]))/253)*14)
+                height=16.5 if r==header_row else body_row_height(row,widths)
+                if r>header_row and sheet.get('layout')=='description':height=max(14,math.ceil(len(text(row[0]))/253)*14)
                 rows.append(f'<row r="{r}" ht="{height}" customHeight="1">'+''.join(cells)+'</row>')
-            xml=f'<worksheet xmlns="{ns}"><cols>'+''.join(f'<col min="{i}" max="{i}" width="{w}" customWidth="1"/>' for i,w in enumerate(widths,1))+'</cols><sheetData>'+''.join(rows)+f'</sheetData><autoFilter ref="A1:{col(cols)}{len(matrix)}"/></worksheet>'
+            xml=f'<worksheet xmlns="{ns}"><cols>'+''.join(f'<col min="{i}" max="{i}" width="{w}" customWidth="1"/>' for i,w in enumerate(widths,1))+'</cols><sheetData>'+''.join(rows)+f'</sheetData><autoFilter ref="A{header_row}:{col(cols)}{len(matrix)}"/></worksheet>'
             z.writestr(f'xl/worksheets/sheet{index}.xml',xml)
             name=escape(sheet['name'],{'"':'&quot;'})
             book.append(f'<sheet name="{name}" sheetId="{index}" r:id="rId{index}"/>')

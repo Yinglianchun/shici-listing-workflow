@@ -6,8 +6,10 @@ from product_analysis import analysis_sheets
 def blank(name,headers):return {'name':name,'headers':headers,'rows':[],'template_rows':4}
 def empty(plans):return [{**p,'rows':[],'template_rows':4} for p in plans]
 def templates():
+    from master_workbook import blank_master_sheets
     final={'advertising_keywords':[],'prefix_groups':[],'description':'','description_selection':[],'description_limit':9000}
     return {
+      '素材总表空模板.xlsx':blank_master_sheets(),
       '00_本品分析.xlsx':empty(analysis_sheets({})),
       '00_本品资料.xlsx':[blank('本品完整资料',['ASIN','标题','完整详情','待确认事项','资料来源'])],
       '01_导入与基础去重.xlsx':[blank('原始来源',['来源ID','文件','CSV位置','ASIN','类型','原文']),blank('基础去重',['原文ID','类型','完整原文','来源ID','ASIN'])],

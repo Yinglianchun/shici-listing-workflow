@@ -80,8 +80,9 @@ def public_job(identifier,stage=None,search=''):
     if status.get('state')=='running' and (not process or process.poll() is not None):
         status['state']='failed';status['error']='处理进程已结束；已完成的表格仍可下载。';save(folder/'status.json',status)
     result={'id':identifier,'title':cfg['product']['title'],'asin':cfg['product']['asin'],'created':cfg['created'],
+        'report_mode':cfg.get('report_mode','stage-files'),
         'llm_model':cfg['llm_model'],'embedding_model':cfg['embedding_model'],'status':status,'until':cfg.get('until',9),'workspace':str(folder.resolve()),'export_prefix':cfg.get('export_prefix',''),
-        'files':[p.relative_to(folder).as_posix() for base in [folder,folder/'表格'] if base.exists() for p in base.iterdir() if p.is_file() and p.suffix in ('.xlsx','.csv','.txt')],
+        'files':[p.relative_to(folder).as_posix() for base in [folder,folder/'表格'] if base.exists() for p in base.iterdir() if p.is_file() and p.suffix in (('.xlsx','.docx') if cfg.get('report_mode')=='single-workbook' else ('.xlsx','.csv','.txt'))],
         'preview':[]}
     log_path=folder/'process.log'
     if status.get('state')=='running' and log_path.exists():
@@ -169,7 +170,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(write_handoff(job_folder(parts[2])))
             if len(parts)>=3 and parts[0]=='download':
                 folder=job_folder(parts[1]);path=(folder/urllib.parse.unquote('/'.join(parts[2:]))).resolve()
-                if not path.is_relative_to(folder.resolve()) or path.suffix not in ('.xlsx','.csv','.txt'):raise ValueError('文件不可下载')
+                if not path.is_relative_to(folder.resolve()) or path.suffix not in ('.xlsx','.csv','.txt','.docx'):raise ValueError('文件不可下载')
                 return self.file(path,True)
             if url.path=='/skill':
                 buffer=io.BytesIO()
@@ -227,7 +228,8 @@ class Handler(BaseHTTPRequestHandler):
                 cfg={'id':identifier,'export_prefix':prefix(product['asin'],date),'created':time.strftime('%Y-%m-%d %H:%M'),'inputs':files,'product':product,'test':data.get('test') is True,
                     'llm_model':data.get('llm_model') or SETTINGS['llm_model'],'embedding_model':data.get('embedding_model') or SETTINGS['embedding_model'],
                     'max_characters':max(1,min(int(data.get('max_characters',9000)),50000)),'workflow':'dedup-first',
-                    'excel_subdir':'表格','analyze_product':True,
+                    'excel_subdir':'表格','analyze_product':True,'report_mode':'single-workbook','dynamic_qa_topics':True,
+                    'fixed_negative_phrases':[s.strip() for s in p.get('negative_phrases','').splitlines() if s.strip()],
                     'topics':[s.strip() for s in p.get('topics','').splitlines() if s.strip()],'until':int(data.get('until',1))}
                 save(folder/'job.json',cfg);save(folder/'status.json',{'state':'pending','steps':[{'name':s,'state':'pending'} for s in STAGES]})
                 launch_job(identifier,int(data.get('until',9)))

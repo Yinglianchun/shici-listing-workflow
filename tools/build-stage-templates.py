@@ -19,5 +19,5 @@ for name,plans in templates().items():
     for folder in [assets,installed]:shutil.copyfile(work/name,folder/name)
     public_name='ASIN_日期_'+('05_关键词分级.xlsx' if name=='关键词分级空模板.xlsx' else name)
     for folder in [output,local]:shutil.copyfile(work/name,folder/public_name)
-    if name=='关键词分级空模板.xlsx':shutil.copyfile(work/name,root/'templates'/name)
+    if name in ('关键词分级空模板.xlsx','素材总表空模板.xlsx'):shutil.copyfile(work/name,root/'templates'/name)
 print(str(output))

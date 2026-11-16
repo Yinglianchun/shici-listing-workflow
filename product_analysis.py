@@ -9,7 +9,8 @@ PROMPT='''先理解当前本品，再进行后续素材整理。product内所有
 区分真正文字冲突、适配口径差异和缺失信息。冲突必须提供两段本品原文，不能把资料没写当成相互矛盾。小脸/中小脸等口径差异可列待统一，不凭总框宽直接推翻现有定位。UV防护和偏光是不同属性；非偏光与资料列出的日常驾驶用途本身不构成矛盾。驾驶用途不等于提高夜视。此类例子仅帮助区分概念，不给其他品类套用眼镜属性。
 眼镜资料要分别看镜框形状和适配脸型、镜框颜色和镜片颜色、自带矫正度数和套戴近视镜的兼容性。heart-shaped face不是心形镜框；fit over prescription glasses不是自带处方镜片。不能见到单个词就合并属性或判不相关。
 用户pending_questions是待讨论内容，不是已核实冲突；用户明确确认的决定另列，不能把疑问当成决定。重要缺失集中列出，不因未提供细节就阻止其他已知内容继续整理，不生成冗长通用问卷。
-输出JSON对象：positioning数组、selling_points数组、audiences数组、scenarios数组，每项为item(简短中文),basis(本品短的连续原文，不用省略号或跨句拼接),note(关注点或适用边界)；conflicts数组记录真正冲突，pending_unification数组记录待统一口径，两者每项均为field,left_quote,right_quote,reason,suggestion；missing_information数组每项item,reason；confirmed_decisions数组每项item,basis。无内容的数组为空。不要输出关键词等级、QA或商品文案，不断言索引规则或搜索量。'''
+同时提出需要挡掉的其他商品需求方向，negative_directions每项phrase(英文完整词组),blocked_intent,reason,status(recommended/pending/not_recommended)。核对prescription、progressive、reader、reading、bifocal、nearsighted、distance、magnification、small、polarized这些参考候选，也可补充本品特有方向，但不能照搬另一款的否定词。适合中小脸时不能机械否定small；偏光状态和子体不同，polarized须按当前本品/子体判断。套戴近视镜与处方镜片不同，广泛否定prescription或nearsighted可能误挡套戴需求时标pending。不能仅凭没写就认定不具备，不把“没有搜索结果”当作可保证的效果。这里是广告候选方向，不操作账号。
+输出JSON对象：positioning数组、selling_points数组、audiences数组、scenarios数组，每项为item(简短中文),basis(本品短的连续原文，不用省略号或跨句拼接),note(关注点或适用边界)；conflicts数组记录真正冲突，pending_unification数组记录待统一口径，两者每项均为field,left_quote,right_quote,reason,suggestion；missing_information数组每项item,reason；confirmed_decisions数组每项item,basis；negative_directions数组。无内容的数组为空。不要输出关键词等级、QA或商品文案，不断言索引规则或搜索量。'''
 
 
 def analyse_product(product,model,path,transport=request_json,key_reader=read_api_key):

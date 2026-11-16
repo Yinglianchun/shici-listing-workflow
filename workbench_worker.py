@@ -19,6 +19,9 @@ from keyword_layout import keyword_sheets
 from naming import named_file
 from group_dedup import deduplicate_groups
 from product_analysis import analyse_product,analysis_sheets
+from master_workbook import update_master
+from qa_topics import discover_topics
+from word_export import export_description
 from output_plans import screened_sheets,question_grade_sheets,cleaned_question_sheets,prefix_sheets,description_sheets,approved_ids,qa_sheets
 
 SORTED_STAGES=['导入与基础去重','相似素材排序分组','本品适用性筛选','高重合素材去重','方向分类与属性分级','独立QA选题与回答','短语清洗与本品复核','前缀整理与广告词','描述组合与导出']
@@ -35,6 +38,7 @@ def run(folder,until=9,compose_only=False):
         from legacy_worker import run as old_run
         return old_run(folder,until,compose_only)
     new_order=cfg.get('workflow')=='dedup-first'
+    single=cfg.get('report_mode')=='single-workbook'
     stages=STAGES if new_order else SORTED_STAGES
     product=cfg['product'];model=cfg['llm_model'];cache=Path(cfg.get('cache_dir',Path(__file__).parent/'output'))
     status=read(folder/'status.json');status.update(state='running',error='');status.setdefault('started_at',time.time());save(folder/'status.json',status)
@@ -42,8 +46,11 @@ def run(folder,until=9,compose_only=False):
         status['current']=index;status['steps'][index-1]['state']='running';save(folder/'status.json',status)
         print(f'阶段 {index}/9：{stages[index-1]}',flush=True)
     def done(index,plans):
-        path=export_excel(plans,folder/f'{index:02d}_{stages[index-1]}.xlsx')
+        path=update_master(folder,index,plans) if single else export_excel(plans,folder/f'{index:02d}_{stages[index-1]}.xlsx')
         status['steps'][index-1].update(state='done',file=path.relative_to(folder).as_posix());save(folder/'status.json',status);write_handoff(folder)
+    def question_details(plans):
+        if single:save(folder/'stage5_questions.plan.json',plans)
+        else:export_excel(plans,folder/'05_问句与分级明细.xlsx')
     def ready(index):return (folder/f'stage{index}.json').is_file() and status['steps'][index-1]['state']=='done' and (folder/status['steps'][index-1].get('file','')).is_file()
     try:
         save(folder/'product.json',product)
@@ -51,14 +58,14 @@ def run(folder,until=9,compose_only=False):
             print('阶段 00：本品卖点与资料冲突分析',flush=True)
             status['product_analysis_state']='running';save(folder/'status.json',status)
             analysed=analyse_product(product,model,folder/'product_analysis.json')
-            analysis_path=export_excel(analysis_sheets(analysed['analysis']),folder/'00_本品分析.xlsx')
+            analysis_path=update_master(folder,0) if single else export_excel(analysis_sheets(analysed['analysis']),folder/'00_本品分析.xlsx')
             product={**product,'analysis':analysed['analysis']}
             save(folder/'product.json',product)
             status.update(product_analysis_state='done',product_analysis_file=analysis_path.relative_to(folder).as_posix())
             save(folder/'status.json',status)
         elif (folder/'product_analysis.json').exists():
             product={**product,'analysis':read(folder/'product_analysis.json')['analysis']}
-        if not named_file(folder,'00_本品资料.xlsx').exists():
+        if not single and not named_file(folder,'00_本品资料.xlsx').exists():
             export_excel([sheet('本品完整资料',['ASIN','标题','完整详情','待确认事项','资料来源'],[[product['asin'],product.get('title',''),product.get('raw_details',product.get('facts',{})),product.get('pending_questions',[]),product.get('source_type','用户提供')]])],folder/'00_本品资料.xlsx')
         if not compose_only:
             if not ready(1):
@@ -124,11 +131,15 @@ def run(folder,until=9,compose_only=False):
             if not new_order:dedup=read(folder/'stage4.json')
             roots=dedup['representatives'];kept=[g for g in active if g['group_id'] in dedup['kept_ids']]
             if until==4:return
+            topic_names=cfg.get('topics') or None
+            if cfg.get('dynamic_qa_topics') and not topic_names:
+                topic_names=discover_topics(active,product,model,folder/'qa_topics.json')
+            if topic_names:save(folder/'topics.json',topic_names)
             if not ready(5):
                 begin(5);existing={(g['kind'],g['marketplace'],g['text']):g['assessment'] for f in cfg.get('reuse_grades',[]) for g in read(f)}
                 assessments={g['group_id']:existing[(g['kind'],g['marketplace'],g['text'])] for g in kept if (g['kind'],g['marketplace'],g['text']) in existing}
                 missing=[g for g in kept if g['group_id'] not in assessments]
-                if missing:assessments.update(analyse(prepare_items(missing,sources),cache/'assessment-cache.sqlite3',model=model,progress=lambda s:print(s,flush=True))[0])
+                if missing:assessments.update(analyse(prepare_items(missing,sources),cache/'assessment-cache.sqlite3',model=model,progress=lambda s:print(s,flush=True),topics=topic_names)[0])
                 for g in kept:
                     a=assessments[g['group_id']];a=compute_level(a,g['kind']) if 'error' not in a else {**a,'level':None,'grading_reasons':[a['error']]}
                     if 'level' in app[g['group_id']]:a={**a,'level':app[g['group_id']]['level']}
@@ -141,7 +152,7 @@ def run(folder,until=9,compose_only=False):
                         if meaningful_words(g['text'])!=meaningful_words(by_id[root]['text']):
                             g['assessment']={**g['assessment'],'level':None,'attributes':[],'grading_reasons':['覆盖删除的原问仅供QA参考，不继承较长问题的属性等级']}
                 save(folder/'stage5.json',graded)
-                export_excel(question_grade_sheets(graded,app,roots),folder/'05_问句与分级明细.xlsx')
+                question_details(question_grade_sheets(graded,app,roots))
                 done(5,keyword_sheets(graded,groups,sources,app,roots,product))
             graded=read(folder/'stage5.json');assessments={g['group_id']:g['assessment'] for g in graded}
             if until==5:return
@@ -151,7 +162,8 @@ def run(folder,until=9,compose_only=False):
                 else:
                     qin=folder/'qa_input';qin.mkdir(exist_ok=True)
                     save(qin/'groups.json',active);save(qin/'sources.json',sources);save(qin/'graded_groups.json',graded);save(qin/'applicability.json',app)
-                    subprocess.run([sys.executable,str(Path(__file__).parent/'qa.py'),'--input',str(qin),'--assessments',str(qin),'--product',str(folder/'product.json'),'--model',model,'--out',str(folder/'qa')],check=True)
+                    if topic_names:save(qin/'topics.json',topic_names)
+                    subprocess.run([sys.executable,'-X','utf8',str(Path(__file__).parent/'qa.py'),'--input',str(qin),'--assessments',str(qin),'--product',str(folder/'product.json'),'--model',model,'--out',str(folder/'qa')],check=True)
                     qa=read(folder/'qa/qa_selection.json')
                 save(folder/'stage6.json',qa)
                 done(6,qa_sheets(qa))
@@ -176,8 +188,8 @@ def run(folder,until=9,compose_only=False):
         app=read(folder/('stage4.json' if new_order else 'stage3.json'))
         ids=approved_ids(reviews)
         final_app={i:{**value,'status':value.get('status') if i in ids else 'exclude'} for i,value in app.items()}
+        question_details(question_grade_sheets(graded,final_app,dedup['representatives']))
         done(5,keyword_sheets(graded,groups,imported['sources'],final_app,dedup['representatives'],product))
-        export_excel(question_grade_sheets(graded,final_app,dedup['representatives']),folder/'05_问句与分级明细.xlsx')
         done(7,cleaned_question_sheets(reviews,graded))
         if until==7:return
         begin(8);final=compose_reviewed(reviews,cfg['max_characters'])
@@ -188,13 +200,16 @@ def run(folder,until=9,compose_only=False):
         final['negative_keyword_candidates']=negative_candidates(groups,negative_app,graded,dedup['representatives'])
         save(folder/'stage8.json',final)
         done(8,prefix_sheets(final))
-        write_csv(named_file(folder,'08_广告关键词.csv' if cfg.get('export_prefix') else '广告关键词.csv'),['关键词'],[[r['keyword']] for r in final['advertising_keywords']])
-        write_csv(named_file(folder,'08_否定关键词候选.csv'),['完整词句','类型','等级','建议原因','本品依据','来源ID','匹配方式'],
-            [[r['text'],r['kind'],r.get('level',''),r['reason'],r.get('basis',''),','.join(r['sources']),'待选择'] for r in final['negative_keyword_candidates']])
+        if not single:
+            write_csv(named_file(folder,'08_广告关键词.csv' if cfg.get('export_prefix') else '广告关键词.csv'),['关键词'],[[r['keyword']] for r in final['advertising_keywords']])
+            write_csv(named_file(folder,'08_否定关键词候选.csv'),['完整词句','类型','等级','建议原因','本品依据','来源ID','匹配方式'],
+                [[r['text'],r['kind'],r.get('level',''),r['reason'],r.get('basis',''),','.join(r['sources']),'待选择'] for r in final['negative_keyword_candidates']])
         if until==8:return
-        begin(9);save(folder/'stage9.json',final);named_file(folder,'09_商品描述素材草稿.txt' if cfg.get('export_prefix') else '商品描述素材草稿.txt').write_text(final['description'],encoding='utf-8')
+        begin(9);save(folder/'stage9.json',final)
+        if single:export_description(final['description'],named_file(folder,'商品描述素材.docx'),product['asin'],cfg['max_characters'])
+        else:named_file(folder,'09_商品描述素材草稿.txt' if cfg.get('export_prefix') else '商品描述素材草稿.txt').write_text(final['description'],encoding='utf-8')
         done(9,description_sheets(final))
-        status['summary']={'keywords':len(final['advertising_keywords']),'characters':len(final['description']),'passed':final['passed_count'],'reviewed':final['reviewed_count']}
+        status['summary']={'keywords':sum(r['level']>=2 for r in final['advertising_keywords']) if single else len(final['advertising_keywords']),'characters':len(final['description']),'passed':final['passed_count'],'reviewed':final['reviewed_count']}
     except Exception as error:status.update(state='failed',error=str(error));raise
     finally:
         if status['state']=='running':status['state']='completed' if until>=9 else 'paused'
