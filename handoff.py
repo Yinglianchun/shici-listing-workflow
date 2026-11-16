@@ -80,6 +80,7 @@ def write_handoff(folder):
         if saved.get('product')==product:product={**product,'analysis':saved['analysis']}
     (folder/'product.json').write_text(json.dumps(product,ensure_ascii=False,indent=2),encoding='utf-8')
     lines=['请使用 listing-material-workflow skill 接着整理这个项目。',f'项目文件夹：{folder}',
+        '先读全已有五点、参数和用户补充，再追问尚未提供的现有QA/A+问答、图片说明及页面未写但实物已确认卖点；问清ASIN/子体，确认后同步资料。QA、备选QA、A+及译文站在卖家角度直接回答，不用the listing says、described as等第三方口吻，出处放本品依据；不额外编写无关负面结论。',
         '请直接由你阅读、判断并完成指定阶段，不启动本地工作台、不运行工作流脚本、不调用外部LLM API代跑，也不要求用户安装Python或提供API Key。可用文件/表格工具辅助读写、基础统计与导出Excel；语义分析和内容判断由你自己执行。',
         '如果文件夹换了电脑或位置，以你实际打开的项目文件夹为准，下面文件名均相对该文件夹。',
         '先读取：使用的Skill/listing-material-workflow/SKILL.md，再读 references/stages.md（相对该Skill）。',
