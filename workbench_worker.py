@@ -22,6 +22,7 @@ from product_analysis import analyse_product,analysis_sheets
 from master_workbook import update_master
 from qa_topics import discover_topics
 from word_export import export_description
+from qa_delivery import export_qa
 from output_plans import screened_sheets,question_grade_sheets,cleaned_question_sheets,prefix_sheets,description_sheets,approved_ids,qa_sheets
 
 SORTED_STAGES=['导入与基础去重','相似素材排序分组','本品适用性筛选','高重合素材去重','方向分类与属性分级','独立QA选题与回答','短语清洗与本品复核','前缀整理与广告词','描述组合与导出']
@@ -47,6 +48,7 @@ def run(folder,until=9,compose_only=False):
         print(f'阶段 {index}/9：{stages[index-1]}',flush=True)
     def done(index,plans):
         path=update_master(folder,index,plans) if single else export_excel(plans,folder/f'{index:02d}_{stages[index-1]}.xlsx')
+        if single and index==6:path=export_qa(read(folder/'stage6.json'),folder)
         status['steps'][index-1].update(state='done',file=path.relative_to(folder).as_posix());save(folder/'status.json',status);write_handoff(folder)
     def question_details(plans):
         if single:save(folder/'stage5_questions.plan.json',plans)
@@ -163,7 +165,7 @@ def run(folder,until=9,compose_only=False):
                     qin=folder/'qa_input';qin.mkdir(exist_ok=True)
                     save(qin/'groups.json',active);save(qin/'sources.json',sources);save(qin/'graded_groups.json',graded);save(qin/'applicability.json',app)
                     if topic_names:save(qin/'topics.json',topic_names)
-                    subprocess.run([sys.executable,'-X','utf8',str(Path(__file__).parent/'qa.py'),'--input',str(qin),'--assessments',str(qin),'--product',str(folder/'product.json'),'--model',model,'--out',str(folder/'qa')],check=True)
+                    subprocess.run([sys.executable,'-X','utf8',str(Path(__file__).parent/'qa.py'),'--input',str(qin),'--assessments',str(qin),'--product',str(folder/'product.json'),'--model',model,'--out',str(folder/'qa'),*(['--separate-qa'] if single else [])],check=True)
                     qa=read(folder/'qa/qa_selection.json')
                 save(folder/'stage6.json',qa)
                 done(6,qa_sheets(qa))
@@ -178,6 +180,9 @@ def run(folder,until=9,compose_only=False):
                 plans=cleaned_question_sheets(reviews,graded)
                 done(7,plans)
         reviews=read(folder/'stage7.json');changes=read(folder/'review_decisions.json') if (folder/'review_decisions.json').exists() else {}
+        if single and (folder/'stage6.json').exists():
+            qa_path=export_qa(read(folder/'stage6.json'),folder)
+            status['steps'][5]['file']=qa_path.relative_to(folder).as_posix()
         for r in reviews:
             mid=r['material']['material_id']
             if mid in changes:r['model_review']=r['review'];r['review']={**r['review'],**changes[mid]}

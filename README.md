@@ -2,7 +2,7 @@
 
 本地商品素材整理工具。导入八面马等AI拓词CSV，结合本品资料，整理分级广告词、否定候选、QA与描述素材。
 
-新项目逐阶段更新同一份 `ASIN_日期_素材总表.xlsx`，最终另出 `ASIN_日期_商品描述素材.docx`。空模板位于 `templates/素材总表空模板.xlsx`。原始CSV、JSON和模型返回留作过程资料，不作为额外交付表格。
+新项目逐阶段更新同一份 `ASIN_日期_素材总表.xlsx`，另出 `ASIN_日期_QA与A+问答.xlsx` 和 `ASIN_日期_商品描述素材.docx`，共三个最终文件。空模板位于 `templates/素材总表空模板.xlsx`。原始CSV、JSON和模型返回留作过程资料，不作为额外交付表格。
 
 双击 `启动工作台.cmd` 打开普通小窗口，关闭窗口会停止后台及本次任务。需要Python 3.10+；无边框窗口可用随附组件安装器。没有Python时，把 `skills/listing-material-workflow` 交给能读写文件的AI，由agent直接执行。
 

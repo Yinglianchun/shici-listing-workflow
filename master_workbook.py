@@ -6,7 +6,6 @@ from cleaner import normalize
 from excel_export import export_excel
 from keyword_layout import attribute_details
 from naming import named_file
-from output_plans import qa_sheets
 from product_analysis import analysis_sheets
 
 KW_HEADERS=['Keyword','属性数','核心词','Modifiers','Intent','Level(源表)','出现ASIN数','涉及ASIN','Evidence','建议']
@@ -41,7 +40,6 @@ def blank_master_sheets():
         sheet('其他否定候选',['完整词句','类型','等级','原因','依据','来源ID','匹配方式']),
     ])
     for p in analysis_sheets({}):plans.append(sheet(p['name'],p['headers'],widths=p.get('column_widths')))
-    for p in qa_sheets({'qa':[],'original_questions':[]}):plans.append(sheet(p['name'],p['headers']))
     return plans
 
 
@@ -61,7 +59,6 @@ def build_master(folder,stage=0):
     analysis=read(folder,'product_analysis.json',{}).get('analysis',{})
     for p in analysis_sheets(analysis):tabs[p['name']]['rows']=p['rows']
     qa=read(folder,'stage6.json',{'qa':[],'original_questions':[]})
-    for p in qa_sheets(qa):tabs[p['name']]['rows']=p['rows']
     directions=analysis.get('negative_directions',[])
     for r in directions:
         if not isinstance(r,dict):continue

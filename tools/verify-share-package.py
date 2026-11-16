@@ -53,9 +53,11 @@ try:
  assert relative in handoff['prompt'] and '00本品分析' in handoff['prompt']
  from master_workbook import update_master
  from word_export import export_description
+ from qa_delivery import export_qa
  cfg.update(report_mode='single-workbook',dynamic_qa_topics=True)
  (folder/'job.json').write_text(json.dumps(cfg),encoding='utf-8')
  master=update_master(folder,1)
+ qa_book=export_qa({'qa':[],'original_questions':[]},folder)
  word=export_description('yellow lenses; metal frame',folder/'SMOKE_description.docx','SMOKE')
  (folder/'internal.txt').write_text('process only',encoding='utf-8')
  steps[0]['file']=master.relative_to(folder).as_posix()
@@ -63,6 +65,8 @@ try:
  job=json.load(urllib.request.urlopen(base+'/api/job/'+identifier+'?stage=1'))
  assert job['report_mode']=='single-workbook' and 'internal.txt' not in job['files']
  assert word.name in job['files'] and job['preview']
+ assert qa_book.relative_to(folder).as_posix() in job['files']
+ assert urllib.request.urlopen(base+'/download/'+identifier+'/'+urllib.parse.quote(qa_book.relative_to(folder).as_posix(),safe='')).read()[:2]==b'PK'
  assert urllib.request.urlopen(base+'/download/'+identifier+'/'+word.name).read()[:2]==b'PK'
  handoff=json.load(urllib.request.urlopen(base+'/api/job/'+identifier+'/handoff'))
  assert '素材总表空模板.xlsx' in handoff['prompt']

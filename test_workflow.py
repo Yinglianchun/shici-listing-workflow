@@ -80,7 +80,8 @@ class WorkflowTests(unittest.TestCase):
                 calls.append('final')
                 self.assertTrue(all('red sunglasses' not in r['originals'] for r in materials))
                 return [{'material':r,'review':{'status':'eligible','reason':'fixture'}} for r in materials],{}
-            with patch.multiple(worker,export_excel=export,embed_texts=embed,assess=assess,judge_pairs=judge,deduplicate_groups=grouped,analyse=analyse,analyse_product=analyse_product,discover_topics=discover_topics,final_comparison=final),patch.object(worker.subprocess,'run',qa_process),patch('master_workbook.export_excel',export):
+            from qa_delivery import delivery_sheets
+            with patch.multiple(worker,export_excel=export,export_qa=lambda result,folder:export(delivery_sheets(result),Path(folder)/'QA与A+问答.xlsx'),embed_texts=embed,assess=assess,judge_pairs=judge,deduplicate_groups=grouped,analyse=analyse,analyse_product=analyse_product,discover_topics=discover_topics,final_comparison=final),patch.object(worker.subprocess,'run',qa_process),patch('master_workbook.export_excel',export):
                 if stop_first:
                     worker.run(job,2)
                     self.assertEqual(calls,['embedding'])
@@ -98,7 +99,7 @@ class WorkflowTests(unittest.TestCase):
                 self.assertEqual(worker.read(job/('stage3.json' if flow=='dedup-first' else 'stage4.json'))['representatives']['b'],'a')
                 self.assertIn('c',worker.read(job/('stage3.json' if flow=='dedup-first' else 'stage4.json'))['kept_ids'])
                 tables=list(job.rglob('*.xlsx'));tables=[p for p in tables if '使用的Skill' not in p.parts]
-                self.assertEqual(len(tables),1 if single else 12 if modern else 11)
+                self.assertEqual(len(tables),2 if single else 12 if modern else 11)
                 self.assertTrue(all(p.name.startswith('OWN_2026-11-15_') for p in tables))
                 if modern:
                     self.assertFalse(list(job.glob('*.xlsx')))
@@ -108,7 +109,7 @@ class WorkflowTests(unittest.TestCase):
                 self.assertEqual(worker.read(job/'status.json')['state'],'completed')
                 if single:
                     self.assertEqual(len(list(job.glob('*.docx'))),1)
-                    self.assertEqual(len({s['file'] for s in worker.read(job/'status.json')['steps']}),1)
+                    self.assertEqual(len({s['file'] for s in worker.read(job/'status.json')['steps']}),2)
                 worker.run(job,6);self.assertEqual(len(calls),len(expected))
                 reviews=worker.read(job/'stage7.json');mid=next(r['material']['material_id'] for r in reviews if r['material']['kind']=='keyword')
                 worker.save(job/'review_decisions.json',{mid:{'status':'exclude','reason':'manual'}})
