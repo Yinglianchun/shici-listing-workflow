@@ -150,6 +150,8 @@ def write_four_handoff(folder,cfg):
     lines=[f'请由当前agent直接使用 listing-material-workflow Skill 接着处理：{folder}',
         '先读使用的Skill/listing-material-workflow/SKILL.md及references/stages.md、references/applicability-and-advertising.md，再读product.json及现有四份Excel；有人工续做/续做记录.md时优先按它的最新进度，不重做已完成部分。',
         '当前agent自己阅读、判断和写作，不运行本地语义工作流脚本，不调用其他LLM API代跑；文件工具只辅助读写、排序、基础统计和保存Excel。',
+        '一轮只完成一个步骤：落表、更新续做记录、给下一步提示后停下等用户继续；缺00分析时本轮只补00，不连做03。先完成分级与广告词库，再做独立QA，最后描述。旧程序stage6/7/8对应QA/清洗/广告与前缀，按实际内容映射新Skill步骤。',
+        '分级时补齐本品适用的常用类目词、同义类目表达及有依据的常见一级词，不仅收原CSV裸词；写回实际等级页，Evidence注明本品资料归纳及依据，不编原CSV次数或搜索量，不设最低词量，不把新增词全塞0级。',
         '信息不足必须主动追问。没有本品资料或可读取的ASIN/链接时先问商品和主推子体；只有ASIN/链接先尝试读取，失败再请用户补充标题、五点和参数。缺关键属性或口径冲突时具体提问，答复前相关素材待确认，暂缓依赖这些信息的判断和正式文案，不猜补、不把未提供当作没有；机械整理及依据充分的部分可继续。',
         "women、womens、women's、women’s为同一种表达，其余信息相同时只保留一个，原始拼写和来源留档；核心词匹配与等级不因该拼写变化而改变。有新增属性或条件仍保留，不对其他英文词一律删s。",
         "生成广告词句Excel时，所有工作表A列数据去掉逗号和单引号（,，'‘’）：分隔逗号换空格，单引号删除，合并多余空格；数值含义不变，否定缩写先展开，不能丢not。这是关键词保持完整的标点例外。按最终A列再次去重并计算长度；其他列的完整原文和来源保留原标点，QA/A+不套用。",
@@ -158,9 +160,9 @@ def write_four_handoff(folder,cfg):
         '本品事实、子体适用性、正向投放、文案和否定分别判断；本次不投不等于本品没有。当前用户要求排除他牌词时，不能自行作为竞品词投放或自动否定；品牌原文仍留档。颜色须分框与片、尺寸须分部件/单位，含糊项先问。',
         'QA、备选QA、A+和译文均站在卖家角度直接回答，不用the listing says、described as等第三方口吻。主QA目标10条、备选及2—3条A+，英文分别尽量240—250/480—500字符，不造内容凑满。',
         '页面与补充口径、五点修改建议、需同步的页面字段、共用场景清单写本品资料表；QA、描述和五点建议同步场景。AI拓词不是实际需求或搜索量，不承诺单次出现即可索引。',
-        '07对所有长度的问句素材提炼关键表达填投放表Keyword，C列留完整原问；不只是去问号，不按80字符分档，不一律删介词。保留核心、属性、用途、否定、数值、条件及for/with/without/fit over等必要关系；QA表正式问题不清洗。已有关键词保持完整，提炼表达仍须核对本品，超限不硬截断。',
+        '新Skill的06对所有长度的问句素材提炼关键表达填投放表Keyword，C列留完整原问；不只是去问号，不按80字符分档，不一律删介词。保留核心、属性、用途、否定、数值、条件及for/with/without/fit over等必要关系；QA表正式问题不清洗。已有关键词保持完整，提炼表达仍须核对本品，超限不硬截断。',
         '描述以00定位与卖点为框架，按短语在描述中的作用组织，不平均配额，不漏掉穿搭/派对/购物/社交用途。每组用半角分号连接一段，每组字符上限'+str(cfg.get('max_characters',9000))+'（含空格标点）；超出继续分多组，不定死一组，不丢有效内容、不凑满、不截断。每组一行记录组号、字符数、目标ASIN、父体/子体、适用范围和分配状态；父体仅共用信息，子体仅对应变体信息，未确认目标先待分配，不能用竞品来源ASIN充当目标。采用明细标组号，仍只交同一份描述素材Excel。']
-    if next_stage<=9:lines.append(f'本次只做 {next_stage:02d} {NEW_STAGE_NAMES[next_stage-1]}，完成后先停下。已有stageN.json和input原始CSV可读作对应阶段完整资料；进入03前若缺00分析先补齐。')
+    if next_stage<=9:lines.append(f'旧程序接续位置为stage{next_stage}（{NEW_STAGE_NAMES[next_stage-1]}），这不是新Skill步骤编号。先核对续做记录和现有结果，按新Skill顺序选择第一个未完成步骤，本轮只做该一步；若00缺失，本轮只补00。stageN.json与input原始CSV可读作完整资料。')
     else:lines.append('程序阶段已完成，继续人工核对四份Excel及本次策略，保存修改与来源，不自动发布。')
     prompt='\n\n'.join(lines)+'\n';target=named_file(folder,'接下来怎么做.txt');target.write_text(prompt,encoding='utf-8')
     return {'folder':str(folder),'file':target.name,'completed':completed,'next_stage':next_stage if next_stage<=9 else None,'prompt':prompt}
