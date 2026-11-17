@@ -50,6 +50,8 @@ women、womens、women's、women’s视为同一种表达：其余信息相同�
 
 ## 分级与问句方向分开
 
+生成投放分级关键词与问句Excel时，所有工作表的A列数据统一不含逗号（,、，）和单引号（'、‘、’）。这也是“已有关键词保持完整”的标点例外：单引号删除，作分隔的逗号换为空格，合并多余空格，不能把相邻单词粘在一起；数值中的逗号先按原数值含义处理，不能改变尺寸、数量或单位。否定缩写先展开再去单引号，不能把can't变成can或丢失not。完成清理后再去重，A列长度按最终文本计算。原始关键词、完整原问、来源与依据在其他留档列保留原样；QA/A+及其他交付文件不套用此标点规则。
+
 核心泛词为0级，核心之外每个独立语义限定加1，不数单词。核心已含driving时不再重复计算；14cm arm length、fit over prescription glasses各是一项；fishing和golf分别计数。UV400与UV protection同一防护属性不重复。性别在所选核心词之外仍是限定，不套用其他Skill的性别0级规则。
 
 先确认本次核心词口径，不能为降低等级临时把修饰词并入核心。以已确认的women’s sunglasses为核心时：women’s sunglasses为0级；full frame women’s sunglasses为1级（全框结构）；gold frame women’s sunglasses为1级（金色镜框）；gold full frame women’s sunglasses为2级（金色镜框＋全框结构）。women已在核心中，不重复计数，frame作为部件名也不额外计数。这不等于所有核心之外的性别词一律不计数。直引号/弯引号写法不应改变同一核心的等级。
