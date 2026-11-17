@@ -1,8 +1,30 @@
 import unittest
-from finalize import prefix_groups,compose_reviewed,merge_product_reviews
+from unittest.mock import patch
+from finalize import prefix_groups,compose_reviewed,merge_product_reviews,final_comparison
 
 
 class FinalizeTests(unittest.TestCase):
+    def test_question_key_expression_can_be_rephrased_without_overwriting_original(self):
+        text='How fast do these photochromic sunglasses change tint?'
+        original={'material_id':'q','kind':'ai_generated_question','level':1,'sources':['s'],'qa_used':False,
+                  'text':text,'originals':[text],'phrase':'how fast do these photochromic sunglasses change tint'}
+        expression='photochromic sunglasses tint change speed'
+        with patch('finalize.assess',return_value=({'q':{'status':'eligible','key_expression':expression}},{})):
+            reviews,_=final_comparison([original],{'asin':'OWN'},'unused','test')
+        self.assertEqual(reviews[0]['material']['phrase'],expression)
+        self.assertEqual(reviews[0]['material']['text'],text)
+        self.assertEqual(reviews[0]['material']['originals'],[text])
+        self.assertTrue(original['phrase'].startswith('how fast'))
+        self.assertEqual(compose_reviewed(reviews)['description'],expression)
+
+    def test_rephrasing_cannot_reintroduce_an_excluded_brand(self):
+        original={'material_id':'q','kind':'ai_generated_question','originals':['Are these frames gold?'],'phrase':'frames gold'}
+        with patch('finalize.assess',return_value=({'q':{'status':'eligible','key_expression':'ViewJoy gold frame sunglasses'}},{})):
+            reviews,_=final_comparison([original],{'excluded_brands':['ViewJoy']},'unused','test')
+        self.assertEqual(reviews[0]['review']['status'],'exclude')
+        self.assertEqual(reviews[0]['review']['model_review']['status'],'eligible')
+        self.assertEqual(original['phrase'],'frames gold')
+
     def test_copy_review_cannot_change_original_ad_or_product_decision(self):
         original={'g':{'status':'eligible','ad_status':'exclude','ad_reason':'campaign'}}
         reviews=[{'material':{'material_id':'m','member_ids':['g']},'review':{'status':'exclude','reason':'bad cleaned copy','ad_status':'eligible'}}]

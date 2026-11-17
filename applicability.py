@@ -37,7 +37,8 @@ GENERAL_PROMPT+='''\n分别判断本品事实、当前子体和本次投放：st
 anti-glare、TAC和polarized不是可以直接互换的同义词；只按本品资料确认各自属性。用户可能因投放策略排除anti-glare/TAC，但明确已有特性可继续用于文案；非偏光本身不够推导不具备anti-glare或镜片材质。兼具不支持属性的完整短语不能因一部分匹配就放行。
 别人品牌名按本次策略判断：未授权竞品品牌投放时从正向投放及文案排除整条，保留原文用于留档，不能只剥掉品牌把剩余句子当本品原句。关键词和问句、大小写及已确认的品牌写法都要检查；未经确认不把普通形容词误判品牌。
 用途包括功能活动和穿搭、派对、购物、社交、拍照，不因不是驾驶/徒步而忽略。'''
-FINAL_PROMPT=GENERAL_PROMPT+'''\n这是分级、清洗后，组合描述之前的第二次对照自查。status在本次只表示清洗后文案可用性，不因仅本次不投就排除已确认的描述素材，也不因文案清洗失败而否定原始广告词。原始广告策略沿用04，不能在本次顺手改写。只有发现原始词句本身的本品事实判断确需更正时，额外返回product_status及product_reason、basis，明确对应本品依据；清洗丢条件等问题不改变原始事实判断。尤其检查清洗是否丢失否定、数字、条件或关系，以及合并是否混入本品没有的属性。只依据当前product完整资料，不依据上一阶段eligible标签。返回results数组。'''
+FINAL_PROMPT=GENERAL_PROMPT+'''\n这是分级、清洗后，组合描述之前的第二次对照自查。对每条ai_generated_question，依据完整原问提炼key_expression（英文关键表达），并以最终表达评估status。所有长度都提炼，不分80字符以内/以上，不只是去问号或机械删停用词。去掉提问句式、助动词和代商品代词，可按搜索表达重排；保留商品核心、独立属性、用途、否定、数字、单位和条件，for/with/without/under等有意义的关系可保留。例：Are these sunglasses good for driving and outdoor wear? → sunglasses for driving and outdoor wear；Do these glasses fit over prescription glasses? → glasses fit over prescription glasses。how long/how fast等要改写为耗时/速度的关键表达，不删掉提问关注点；不把问到的功能自动写成本品已具备，不通过删掉实质限定把不适用原问变成可用。不能完成可靠提炼时status=pending，原问留档。已有keyword保持完整，不重写其原始文本。80字符只是后续投放格式限制之一，不是保留问句的理由；不得为凑长度硬截断或删条件。
+status在本次只表示最终清洗表达可用性，不因仅本次不投就排除已确认的描述素材，也不因文案清洗失败而否定原始广告词。原始广告策略沿用04，不能在本次顺手改写。只有发现原始词句本身的本品事实判断确需更正时，额外返回product_status及product_reason、basis，明确对应本品依据；清洗丢条件等问题不改变原始事实判断。尤其检查清洗是否丢失否定、数字、条件或关系，以及合并是否混入本品没有的属性。只依据当前product完整资料，不依据上一阶段eligible标签。返回results数组，每项仍有id/status/reason/basis；问句另有key_expression，不回答原问、不修改原始来源。'''
 
 
 def assess(groups, product, cache_path, batch_size=24, workers=6,model=DEFAULT_MODEL,final=False):

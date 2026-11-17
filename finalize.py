@@ -4,6 +4,7 @@ from cleaner import normalize
 from applicability import assess
 from materials import assemble
 from keyword_layout import keyword_identity
+from ad_policy import matched_brand
 
 
 def merge_product_reviews(app,reviews,changes=None):
@@ -95,7 +96,19 @@ def final_comparison(materials,product,cache,model):
     inputs=[{'group_id':r['material_id'],'kind':r['kind'],
         'text':'原文：'+' | '.join(r['originals'])+'\n清洗后：'+r['phrase']} for r in materials]
     decisions,stats=assess(inputs,product,cache,model=model,final=True)
-    return [{'material':r,'review':decisions.get(r['material_id'],{'status':'pending','reason':'未取得本条自查结果'})} for r in materials],stats
+    output=[]
+    for original in materials:
+        review=decisions.get(original['material_id'],{'status':'pending','reason':'未取得本条自查结果'})
+        material=dict(original);expression=review.get('key_expression')
+        if material['kind']=='ai_generated_question' and isinstance(expression,str) and expression.strip():
+            material['phrase_before_rewrite']=material.get('phrase','')
+            material['phrase']=normalize(expression)
+            material['phrase_status']='关键表达草稿'
+            brand=matched_brand(material['phrase'],product.get('excluded_brands',[]))
+            if brand:
+                review={**review,'model_review':dict(review),'status':'exclude','reason':'关键表达含用户确认排除的他牌：'+brand}
+        output.append({'material':material,'review':review})
+    return output,stats
 
 
 def compose_reviewed(reviews,limit=9000):

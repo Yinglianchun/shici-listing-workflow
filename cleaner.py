@@ -18,7 +18,7 @@ def normalize(text):
 
 
 def phrase(text):
-    """Derived review material, never a product fact or automatic merge key."""
+    """Extract a key-expression draft at any length; retain meaningful relationships."""
     text = normalize(text)
     # Expand negation before removing auxiliaries (can't must not become 't).
     text = re.sub(r"\bcan't\b", 'can not', text)
@@ -33,12 +33,13 @@ def phrase(text):
         return {'text': text, 'needs_review': True, 'reason': '程度或数量意图需改写，保留原表达'}
     else:
         text = re.sub(r'^(?:what is|what are|how should|how can|how do|how does|do|does|are|is|can|will)\s+', '', text)
-    # Protect relationships whose removal changes the requested product/function.
-    text = re.sub(r'\b(fit|wear|worn) over\b', lambda match:match.group().replace(' ','_'), text)
-    text = re.sub(r'\b(?:what|how|do|does|did|is|are|was|were|be|been|can|could|would|should|will|may|might|have|has|had|these|those|this|that|they|them|their|it|its|i|my|me|you|your|we|our|a|an|the|for|of|to|in|on|at|by|from|with|over|into|during|through|under|about)\b', ' ', text)
-    for relation in ('fit','wear','worn'):
-        text = text.replace(relation+'_over',relation+' over')
-    # Negation (without, not, non-) stays intact.
+    # Remove question scaffolding, not every preposition: "for hiking", "with a
+    # case", "without slipping", "under 30 g" and "fit over" carry meaning.
+    text = re.sub(r'\b(?:what|how|do|does|did|is|are|was|were|be|been|can|could|would|should|will|may|might|have|has|had|these|those|this|that|they|them|their|it|its|i|my|me|you|your|we|our|a|an|the)\b', ' ', text)
+    text = re.sub(r'\b(?:good|suitable|designed|intended)\s+for\b', 'for', text)
+    text = re.sub(r'\b(?:come|comes)\s+with\b', 'with', text)
+    text = re.sub(r'[?？]', ' ', text)
+    # Negation, dimensions, use cases and comparative conditions stay intact.
     return {'text': re.sub(r'\s+', ' ', text).strip(), 'needs_review': True, 'reason': '短语候选；未核实商品适用性'}
 
 

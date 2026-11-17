@@ -22,7 +22,7 @@ class MaterialTests(unittest.TestCase):
         self.assertEqual(phrase('Do these sunglasses fit over prescription glasses?')['text'],'sunglasses fit over prescription glasses')
         self.assertEqual(phrase('Are these sunglasses without nose pads?')['text'],'sunglasses without nose pads')
         self.assertEqual(phrase('How should I clean my sunglasses?')['text'],'clean sunglasses')
-        self.assertEqual(phrase('How long do these sunglasses take to darken in sunlight?')['text'],'sunglasses darkening time sunlight')
+        self.assertEqual(phrase('How long do these sunglasses take to darken in sunlight?')['text'],'sunglasses darkening time in sunlight')
 
     def test_unsupported_member_cannot_be_reintroduced_by_a_merge(self):
         groups=[{'group_id':i,'kind':'keyword','text':t,'marketplace':'US','sources':[i],'asins':['OWN']} for i,t in [('A','metal sunglasses'),('B','plastic sunglasses')]]

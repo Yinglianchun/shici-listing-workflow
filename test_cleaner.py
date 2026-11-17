@@ -32,14 +32,25 @@ class CleanerTests(unittest.TestCase):
                    source(4, 'non-polarized'), source(5, 'polarized', kind='keyword'), source(6, 'polarized', market='DE')]
         self.assertEqual(len(deduplicate(records)), 6)
 
-    def test_for_removed_only_in_derived_phrase(self):
+    def test_key_expression_keeps_meaningful_prepositions_and_original(self):
         raw = 'Are these sunglasses for men?'
         result = deduplicate([source(1, raw)])[0]
         self.assertEqual(result['text'], raw)
-        self.assertEqual(result['phrase_candidate']['text'], 'sunglasses men')
+        self.assertEqual(result['phrase_candidate']['text'], 'sunglasses for men')
         self.assertIn('fit over', phrase('Do these glasses fit over prescription glasses?')['text'])
         self.assertIn('without slipping', phrase('Do these glasses stay without slipping?')['text'])
         self.assertIn('darkening time', phrase('How long do night driving glasses with photochromic lenses take to darken?')['text'])
+
+    def test_short_and_long_questions_both_become_key_expression_drafts(self):
+        self.assertEqual(phrase('Are these sunglasses good for driving and outdoor wear?')['text'],'sunglasses for driving and outdoor wear')
+        self.assertEqual(phrase('Do these sunglasses come with a case?')['text'],'sunglasses with case')
+        raw='Are these sunglasses suitable for driving, hiking, shopping, parties, travel and everyday outdoor wear?'
+        self.assertGreater(len(raw),80)
+        result=phrase(raw)['text']
+        self.assertTrue(result.startswith('sunglasses for driving'))
+        self.assertIn('parties',result);self.assertIn('shopping',result)
+        self.assertNotIn('?',result)
+        self.assertIn('under 30 g',phrase('Are these sunglasses under 30 g?')['text'])
 
     def test_similarity_never_merges_different_fit(self):
         groups = deduplicate([source(1, 'Are these sunglasses suitable for small faces?'), source(2, 'Are these sunglasses suitable for large faces?')])
