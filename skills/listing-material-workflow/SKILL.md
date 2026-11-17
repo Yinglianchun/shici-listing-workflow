@@ -46,6 +46,8 @@ description: 将八面马等AI拓词CSV整理为本品QA、分级广告词、否
 
 核心泛词为0级，核心之外每个独立语义限定加1，不数单词。核心已含driving时不再重复计算；14cm arm length、fit over prescription glasses各是一项；fishing和golf分别计数。UV400与UV protection同一防护属性不重复。性别在所选核心词之外仍是限定，不套用其他Skill的性别0级规则。
 
+先确认本次核心词口径，不能为降低等级临时把修饰词并入核心。以已确认的women’s sunglasses为核心时：women’s sunglasses为0级；full frame women’s sunglasses为1级（全框结构）；gold frame women’s sunglasses为1级（金色镜框）；gold full frame women’s sunglasses为2级（金色镜框＋全框结构）。women已在核心中，不重复计数，frame作为部件名也不额外计数。这不等于所有核心之外的性别词一律不计数。直引号/弯引号写法不应改变同一核心的等级。
+
 How do I clean these sunglasses?没有额外商品限定，为0级；清洁是提问方向，不额外加级。属性数不是搜索量或竞价等级，不照搬旧Level或Modifiers分块。完整包含删除的短问句不能继承较长问题的等级。
 
 non-polarized/non polarized、anti-glare/anti glare、non-slip/non slip分别识别为同一完整属性，保留否定；titanium metal frame的同一材质父子项只计一次，轻量和金属这类独立限定仍分别算。区分镜框形状与适配脸型、框色与镜片色、自带度数与套戴兼容性；heart-shaped face不是心形镜框，prescription不能触词即删。

@@ -14,6 +14,27 @@ def attribute(concept,value,evidence):
 
 
 class GradingTests(unittest.TestCase):
+    def test_confirmed_womens_core_and_complete_frame_attributes(self):
+        core="women's sunglasses"
+        cases=[('',[],0),('full frame ',[attribute('frame_structure','full frame','full frame')],1),
+               ('gold frame ',[attribute('frame_color','gold','gold frame')],1),
+               ('gold full frame ',[attribute('frame_color','gold','gold'),attribute('frame_structure','full frame','full frame')],2)]
+        for prefix,attrs,expected in cases:
+            for spelling in (core,'women’s sunglasses'):
+                with self.subTest(text=prefix+spelling):
+                    item={'id':'A','text':prefix+spelling,'kind':'keyword','core_candidates':[core]}
+                    result=normalize_assessment(row('A',core,[*attrs,attribute('gender','women','women')]),item)
+                    self.assertEqual(compute_level(result,'keyword')['level'],expected)
+                    self.assertEqual(len(result['excluded_core_attributes']),1)
+
+    def test_measurement_is_one_attribute_and_gender_outside_core_is_unchanged(self):
+        item={'id':'A','text':'14cm arm length sunglasses','kind':'keyword','core_candidates':['sunglasses']}
+        measured=normalize_assessment(row('A','sunglasses',[attribute('temple_length','14cm','14cm arm length')]),item)
+        self.assertEqual(compute_level(measured,'keyword')['level'],1)
+        item={'id':'B','text':'sunglasses for women','kind':'keyword','core_candidates':['sunglasses']}
+        gender=normalize_assessment(row('B','sunglasses',[attribute('gender','women','for women')]),item)
+        self.assertEqual(compute_level(gender,'keyword')['level'],1)
+
     def test_hyphen_spelling_in_source_and_evidence_does_not_hide_attributes(self):
         for phrase,concept in [('non-polarized','polarization'),('anti-glare','glare_reduction'),('non-slip','slip_resistance')]:
             item={'id':'A','text':phrase+' sunglasses','kind':'keyword','core_candidates':['sunglasses']}
