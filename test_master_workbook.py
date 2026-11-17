@@ -10,6 +10,20 @@ from excel_export import portable_excel
 
 
 class MasterWorkbookTests(unittest.TestCase):
+    def test_copy_rejection_is_not_reported_as_product_mismatch(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d)
+            files={'job.json':{'report_mode':'four-workbooks','product':{'asin':'OWN'}},
+                'stage1.json':{'sources':[],'groups':[{'group_id':'g','text':'lightweight metal sunglasses','kind':'keyword','sources':[],'asins':[]}]},
+                'stage3.json':{'kept_ids':['g']},
+                'stage4.json':{'g':{'status':'eligible','ad_status':'eligible','basis':'confirmed'}},
+                'stage5.json':[{'group_id':'g','text':'lightweight metal sunglasses','kind':'keyword','sources':[],'asins':[],'assessment':{'level':2,'core_term':'sunglasses','attributes':[]}}],
+                'stage7.json':[{'material':{'material_id':'m','member_ids':['g']},'review':{'status':'exclude','reason':'not selected for description'}}]}
+            for name,value in files.items():(root/name).write_text(json.dumps(value),encoding='utf-8')
+            tabs={p['name']:p for p in build_master(root)}
+            self.assertEqual(len(tabs['2级-关键词']['rows']),1)
+            self.assertEqual(tabs['已剔除-附原因']['rows'],[])
+
     def test_blank_template_has_reference_columns_without_old_product_data(self):
         plans=blank_master_sheets()
         self.assertTrue(all(not p['rows'] for p in plans))

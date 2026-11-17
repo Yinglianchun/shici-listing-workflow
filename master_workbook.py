@@ -7,6 +7,7 @@ from excel_export import export_excel
 from keyword_layout import attribute_details
 from naming import named_file
 from product_analysis import analysis_sheets
+from finalize import merge_product_reviews
 
 KW_HEADERS=['Keyword','属性数','核心词','Modifiers','Intent','Level(源表)','出现ASIN数','涉及ASIN','Evidence','建议']
 Q_HEADERS=['Keyword','长度','原问句','处理','属性数','核心词','Modifiers','Intent','Level(源表)','出现ASIN数','涉及ASIN','Evidence','建议']
@@ -54,9 +55,12 @@ def build_master(folder,stage=0):
     dedup=read(folder,'stage3.json',{});roots=dedup.get('representatives',{});kept=set(dedup.get('kept_ids',indexed))
     app=read(folder,'stage4.json',{});graded=read(folder,'stage5.json',[])
     changes=read(folder,'review_decisions.json',{})
-    for entry in read(folder,'stage7.json',[]):
-        review={**entry['review'],**changes.get(entry['material']['material_id'],{})}
-        for identifier in entry['material']['member_ids']:app[identifier]={**app.get(identifier,{}),**review}
+    reviews=read(folder,'stage7.json',[])
+    if cfg.get('report_mode')=='four-workbooks':app=merge_product_reviews(app,reviews,changes)
+    else:
+        for entry in reviews:
+            review={**entry['review'],**changes.get(entry['material']['material_id'],{})}
+            for identifier in entry['material']['member_ids']:app[identifier]={**app.get(identifier,{}),**review}
     assessments={g['group_id']:g.get('assessment',{}) for g in graded}
     suite=cfg.get('report_mode')=='four-workbooks'
     plans=blank_master_sheets(not suite);tabs={p['name']:p for p in plans}

@@ -16,6 +16,8 @@ class AdPolicyTests(unittest.TestCase):
 
     def test_boundaries_and_explicit_list(self):
         self.assertEqual(matched_brand('View Joy glasses',['ViewJoy']),'ViewJoy')
+        self.assertEqual(matched_brand('VIEW.JOY glasses',['ViewJoy']),'ViewJoy')
+        self.assertEqual(matched_brand('View—Joy glasses',['ViewJoy']),'ViewJoy')
         self.assertIsNone(matched_brand('overviewjoy glasses',['ViewJoy']))
         self.assertIsNone(matched_brand('oval glasses',[]))
 

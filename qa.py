@@ -41,6 +41,7 @@ SELLER_VOICE='''QA、备选QA、A+回答和中文译文都站在卖家角度，�
 眼镜原问有汗液腐蚀、长期佩戴/皮肤接触过敏、涂层或抗刮时，提炼有价值的候选供最终优选1—2个；本品明确补充须区分镜框/镜片/涂层及子体。不能从防汗液腐蚀推导长期佩戴不过敏，也不把抗刮写成绝不刮花，缺资料留待补。不把AI原问数量当成真实需求或搜索热度。'''
 PROMPT+='\n'+SELLER_VOICE
 GENERAL_PROMPT+='\n'+SELLER_VOICE
+OTHER_PROMPT=GENERAL_PROMPT+'''\n本次输入是完整原问池中尚未分入方向的原问，覆盖前文“一个方向一问”的批次限制：从中选择最多10个不同且有价值的具体关注点，每个关注点一问，每个qa项另填topic为具体中文方向。不要把这些问题全部叫“其他”，不要因为广告/描述不适用就跳过有价值的澄清问题；答案仍须符合本品事实。确实不相关的原问保留excluded，缺资料保留备选，不硬凑10条。'''
 
 
 def build_candidates(groups, assessments, sources, applicability=None,topics=None):
@@ -75,8 +76,9 @@ def build_output(buckets, responses, product,include_reserve=False):
     for topic, response in responses.items():
         if not isinstance(response, dict):
             continue
+        allowed_ids={q['id'] for q in buckets.get(topic,[])}
         proposals = response.get('qa', [])
-        proposals=proposals[:1] if isinstance(proposals,list) else []
+        proposals=proposals[:10 if include_reserve and topic=='其他' else 1] if isinstance(proposals,list) else []
         backups=response.get('reserve_qa',[])
         if include_reserve and isinstance(backups,list):proposals=proposals+backups[:1]
         for proposal in proposals:
@@ -86,11 +88,12 @@ def build_output(buckets, responses, product,include_reserve=False):
             covered = proposal.get('covered_question_ids', [])
             covered = covered if isinstance(covered, list) else []
             # A missing reference is retained in the model response, never attached to another question.
-            valid_ids = [i for i in covered if isinstance(i, str) and i in question_map]
+            valid_ids = [i for i in covered if isinstance(i, str) and i in allowed_ids]
             references = [question_map[i] for i in valid_ids]
             candidates = proposal.get('candidate_question_ids', [])
-            candidates = [i for i in candidates if isinstance(i,str) and i in question_map] if isinstance(candidates,list) else []
-            selected.append({**proposal, 'qa_id': identifier, 'topic': topic,
+            candidates = [i for i in candidates if isinstance(i,str) and i in allowed_ids] if isinstance(candidates,list) else []
+            chosen_topic=(proposal.get('topic') or '未分类关注点') if include_reserve and topic=='其他' else topic
+            selected.append({**proposal, 'qa_id': identifier, 'topic': chosen_topic,
                 'covered_originals': references, 'covered_question_ids': valid_ids,
                 'candidate_question_ids':candidates,
                 'status':'回答草稿' if proposal.get('answer_en') else '待补商品资料',
@@ -103,7 +106,7 @@ def build_output(buckets, responses, product,include_reserve=False):
         for key, status in [('reserve', '备用候选'), ('excluded', '不适用建议')]:
             entries = response.get(key, [])
             for entry in entries if isinstance(entries, list) else []:
-                if isinstance(entry, dict) and entry.get('question_id') in dispositions:
+                if isinstance(entry, dict) and entry.get('question_id') in allowed_ids:
                     dispositions[entry['question_id']].append({'status': status, 'reason': entry.get('reason', '')})
     return {'asin': product['asin'], 'selection_input': '原始问句；未使用语义合并结果和关键词等级',
         'source_type': 'AI生成问句', 'qa': selected,
@@ -138,16 +141,17 @@ def main():
     args.out.mkdir(parents=True, exist_ok=True)
     responses = {}
     pending = []
+    def active_prompt(topic):return OTHER_PROMPT if args.separate_qa and topic=='其他' else GENERAL_PROMPT
     for number, (topic, candidates) in enumerate(buckets.items()):
         if not candidates:
             continue
-        if topic=='其他':
+        if topic=='其他' and not args.separate_qa:
             responses[topic]={'qa':[],'reserve':[{'question_id':q['id'],'reason':'备用池：尚未分入主要提问方向'} for q in candidates]}
             continue
         path = args.out/f'topic-{number+1}.json'
         if path.exists():
             saved = json.loads(path.read_text(encoding='utf-8'))
-            if (saved.get('prompt')==GENERAL_PROMPT and saved.get('model')==args.model
+            if (saved.get('prompt')==active_prompt(topic) and saved.get('model')==args.model
                     and saved.get('input')==selection_input(topic,candidates,product)):
                 responses[topic] = saved['response']
         if topic not in responses and not args.selection:
@@ -156,8 +160,8 @@ def main():
     def select(task):
         topic, candidates, path = task
         payload = selection_input(topic,candidates,product)
-        response, usage = request_json([payload], args.model, key, GENERAL_PROMPT)
-        path.write_text(json.dumps({'model': args.model, 'prompt': GENERAL_PROMPT, 'input': payload,
+        response, usage = request_json([payload], args.model, key, active_prompt(topic))
+        path.write_text(json.dumps({'model': args.model, 'prompt': active_prompt(topic), 'input': payload,
             'response': response, 'usage': usage}, ensure_ascii=False, indent=2), encoding='utf-8')
         return topic, response
     failed_topics = []
@@ -175,7 +179,7 @@ def main():
     responses = {topic: responses[topic] for topic in buckets if topic in responses}
     if args.selection:
         edited = json.loads(args.selection.read_text(encoding='utf-8'))
-        responses = {topic: {'qa':[q for q in edited['qa'] if q['topic']==topic],
+        responses = {topic: {'qa':[q for q in edited['qa'] if q['topic']==topic or (args.separate_qa and topic=='其他' and q['topic'] not in buckets)],
             'reserve':response.get('reserve',[]), 'excluded':response.get('excluded',[])}
             for topic in buckets for response in [responses.get(topic,{})]}
     result = build_output(buckets, responses, product,include_reserve=args.separate_qa)

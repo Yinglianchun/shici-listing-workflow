@@ -5,7 +5,7 @@ import re
 def matched_brand(text,brands):
     for brand in brands or []:
         letters=[re.escape(c) for c in str(brand) if c.isalnum()]
-        if letters and re.search(r'(?<!\w)'+r'[\s_-]*'.join(letters)+r'(?!\w)',str(text),re.I):return brand
+        if letters and re.search(r'(?<!\w)'+r'[\W_]*'.join(letters)+r'(?!\w)',str(text),re.I):return brand
     return None
 
 

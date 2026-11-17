@@ -11,7 +11,7 @@ from semantic import embed_texts
 from judge import judge_pairs
 from applicability import assess
 from materials import build
-from finalize import final_comparison,compose_reviewed,negative_candidates
+from finalize import final_comparison,compose_reviewed,negative_candidates,merge_product_reviews,advertising_from_grades
 from excel_export import export_excel
 from handoff import write_handoff
 from ordering import rank_groups,active_groups,duplicate_candidates,deduplicate_similar,restore_lineage,meaningful_words
@@ -141,7 +141,7 @@ def run(folder,until=9,compose_only=False):
             if until==4:return
             topic_names=cfg.get('topics') or None
             if cfg.get('dynamic_qa_topics') and not topic_names:
-                topic_names=discover_topics(active,product,model,folder/'qa_topics.json')
+                topic_names=discover_topics(groups if suite else active,product,model,folder/'qa_topics.json')
             if topic_names:save(folder/'topics.json',topic_names)
             if not ready(5):
                 begin(5);existing={(g['kind'],g['marketplace'],g['text']):g['assessment'] for f in cfg.get('reuse_grades',[]) for g in read(f)}
@@ -169,7 +169,7 @@ def run(folder,until=9,compose_only=False):
                 if cfg.get('reuse_qa'):qa=read(cfg['reuse_qa'])
                 else:
                     qin=folder/'qa_input';qin.mkdir(exist_ok=True)
-                    save(qin/'groups.json',active);save(qin/'sources.json',sources);save(qin/'graded_groups.json',graded);save(qin/'applicability.json',app)
+                    save(qin/'groups.json',groups if suite else active);save(qin/'sources.json',sources);save(qin/'graded_groups.json',graded);save(qin/'applicability.json',app)
                     if topic_names:save(qin/'topics.json',topic_names)
                     subprocess.run([sys.executable,'-X','utf8',str(Path(__file__).parent/'qa.py'),'--input',str(qin),'--assessments',str(qin),'--product',str(folder/'product.json'),'--model',model,'--out',str(folder/'qa'),*(['--separate-qa'] if single else [])],check=True)
                     qa=read(folder/'qa/qa_selection.json')
@@ -192,26 +192,32 @@ def run(folder,until=9,compose_only=False):
             status['steps'][5]['file']=qa_path.relative_to(folder).as_posix()
         for r in reviews:
             mid=r['material']['material_id']
-            if mid in changes:r['model_review']=r['review'];r['review']={**r['review'],**changes[mid]}
+            if mid in changes:
+                manual=changes[mid];r['model_review']=r['review']
+                copy_changes={k:v for k,v in manual.items() if k not in ('status','reason')}
+                if manual.get('scope','all') in ('all','copy') or (manual.get('scope')=='product' and manual.get('status')!='eligible'):
+                    copy_changes.update({k:manual[k] for k in ('status','reason') if k in manual})
+                if 'copy_status' in manual:copy_changes['status']=manual['copy_status']
+                r['review']={**r['review'],**copy_changes}
         # Final product screening also refreshes the earlier graded outputs.
         graded=read(folder/'stage5.json')
         imported=read(folder/'stage1.json');groups=read(folder/'stage2.json')['groups']
         dedup=read(folder/('stage3.json' if new_order else 'stage4.json'))
         app=read(folder/('stage4.json' if new_order else 'stage3.json'))
         ids=approved_ids(reviews)
-        final_app={i:{**value,'status':value.get('status') if i in ids else 'exclude'} for i,value in app.items()}
+        final_app=merge_product_reviews(app,reviews,changes) if suite else {i:{**value,'status':value.get('status') if i in ids else 'exclude'} for i,value in app.items()}
         question_details(question_grade_sheets(graded,final_app,dedup['representatives']))
         done(5,keyword_sheets(graded,groups,imported['sources'],final_app,dedup['representatives'],product))
         done(7,cleaned_question_sheets(reviews,graded))
         if until==7:return
         begin(8);final=compose_reviewed(reviews,cfg['max_characters'])
         if suite:
-            members={r['material']['material_id']:r['material']['member_ids'] for r in reviews}
-            final['advertising_keywords']=[r for r in final['advertising_keywords'] if any(app.get(i,{}).get('ad_status','eligible')=='eligible' for i in members.get(r['material_id'],[]))]
-        negative_app=dict(app)
-        for r in reviews:
-            for identifier in r['material']['member_ids']:
-                negative_app[identifier]={**app.get(identifier,{}),**r['review']}
+            final['advertising_keywords']=advertising_from_grades(graded,final_app,dedup['representatives'],reviews)
+        negative_app=dict(final_app if suite else app)
+        if not suite:
+            for r in reviews:
+                for identifier in r['material']['member_ids']:
+                    negative_app[identifier]={**app.get(identifier,{}),**r['review']}
         final['negative_keyword_candidates']=negative_candidates(groups,negative_app,graded,dedup['representatives'])
         save(folder/'stage8.json',final)
         done(8,prefix_sheets(final))

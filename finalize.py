@@ -6,6 +6,44 @@ from materials import assemble
 from keyword_layout import keyword_identity
 
 
+def merge_product_reviews(app,reviews,changes=None):
+    """Copy review updates copy; product/ad decisions change only in their own scope."""
+    result={i:dict(r) for i,r in app.items()};changes=changes or {}
+    for entry in reviews:
+        material=entry['material'];review=entry['review'];manual=changes.get(material['material_id'],{})
+        for identifier in material['member_ids']:
+            row=result.setdefault(identifier,{})
+            row.update(copy_status=review.get('status','pending'),copy_reason=review.get('reason',''))
+            if review.get('product_status') in ('eligible','exclude','pending','variant_only'):
+                row.update(status=review['product_status'],reason=review.get('product_reason',review.get('reason','')))
+                if review.get('basis'):row['basis']=review['basis']
+            scope=manual.get('scope','all')
+            if 'status' in manual:
+                if scope in ('all','product'):row.update(status=manual['status'],reason=manual.get('reason',''))
+                if scope in ('all','ad'):row.update(ad_status=manual['status'],ad_reason=manual.get('reason',''))
+                if scope in ('all','copy'):row.update(copy_status=manual['status'],copy_reason=manual.get('reason',''))
+            if manual.get('basis') and scope in ('all','product'):row['basis']=manual['basis']
+            for key in ('ad_status','ad_reason','copy_status','copy_reason','level','variant'):
+                if key in manual:row[key]=manual[key]
+    return result
+
+
+def advertising_from_grades(graded,app,roots,reviews):
+    """Advertising uses original graded keywords, independently of description selection."""
+    mids={i:r['material']['material_id'] for r in reviews for i in r['material']['member_ids']}
+    rows=[];seen=set()
+    for g in sorted(graded,key=lambda g:(g['assessment'].get('level') if isinstance(g['assessment'].get('level'),int) else 999,g['text'].casefold())):
+        identifier=g['group_id'];decision=app.get(identifier,{});level=g['assessment'].get('level')
+        if g['kind']!='keyword' or roots.get(identifier,identifier)!=identifier or not isinstance(level,int):continue
+        if decision.get('status')!='eligible' or decision.get('ad_status','eligible')!='eligible':continue
+        identity=keyword_identity(g['text'])
+        if identity in seen:continue
+        seen.add(identity)
+        sources=list(dict.fromkeys(s for original in graded if roots.get(original['group_id'],original['group_id'])==identifier for s in original['sources']))
+        rows.append({'keyword':normalize(g['text']),'level':level,'sources':sources,'material_id':mids.get(identifier,identifier)})
+    return rows
+
+
 def negative_candidates(groups,app,graded,roots):
     assessments={g['group_id']:g['assessment'] for g in graded};output={}
     def add(text,kind,level,reason,basis,sources):

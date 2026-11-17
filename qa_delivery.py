@@ -46,12 +46,21 @@ def curate(result,product,model,path,transport=request_json,key_reader=read_api_
         current.update(answer_characters=len(current.get('answer_en','')),aplus_characters=len(current.get('aplus_answer_en','')))
         return current
     final_main=[finalized(q) for q in main];final_reserve=[finalized(q) for q in candidates if q['qa_id'] not in chosen];final_aplus=[finalized(q) for q in aplus]
-    def brand_in(q):return matched_brand(' '.join(q.get(k,'') for k in ('question_en','question_zh','answer_en','answer_zh','aplus_answer_en','aplus_answer_zh')),product.get('excluded_brands',[]))
-    excluded={q['qa_id']:{**q,'exclusion_reason':'含用户确认排除的他牌：'+str(brand_in(q))} for q in [*final_main,*final_reserve,*final_aplus] if brand_in(q)}
+    def brand_in(q,aplus=False):
+        fields=('question_en','question_zh','aplus_subtitle_en','aplus_answer_en','aplus_answer_zh') if aplus else ('question_en','question_zh','answer_en','answer_zh')
+        return matched_brand(' '.join(q.get(k,'') for k in fields),product.get('excluded_brands',[]))
+    excluded={}
+    for rows,aplus,target in [(final_main,False,'主QA'),(final_reserve,False,'备选QA'),(final_aplus,True,'A+')]:
+        for q in rows:
+            brand=brand_in(q,aplus)
+            if brand:
+                key=q['qa_id']
+                row=excluded.setdefault(key,{**q,'excluded_target':[],'exclusion_reason':'含用户确认排除的他牌：'+str(brand)})
+                row['excluded_target'].append(target)
     # Keep every original draft and its lineage, even when it is not in the main ten.
-    return {**result,'candidate_qa':candidates,'qa':[q for q in final_main if q['qa_id'] not in excluded],
-            'reserve_qa':[q for q in final_reserve if q['qa_id'] not in excluded],
-            'aplus_qa':[q for q in final_aplus if q['qa_id'] not in excluded],'excluded_qa':list(excluded.values()),'selection_reason':selection.get('reason','')}
+    return {**result,'candidate_qa':candidates,'qa':[q for q in final_main if not brand_in(q)],
+            'reserve_qa':[q for q in final_reserve if not brand_in(q)],
+            'aplus_qa':[q for q in final_aplus if not brand_in(q,True)],'excluded_qa':list(excluded.values()),'selection_reason':selection.get('reason','')}
 
 
 def delivery_sheets(result):
@@ -61,19 +70,20 @@ def delivery_sheets(result):
     plans[1]=qa_sheets({**result,'qa':result.get('aplus_qa',main[:3])})[1]
     backup=result.get('reserve_qa',result.get('qa',[])[10:])
     reserve=qa_sheets({'qa':backup})[0];reserve['name']='备选QA'
-    covered={i for q in [*main,*backup] for i in [*q.get('covered_question_ids',[]),*q.get('candidate_question_ids',[])]}
+    linked={q['qa_id']:q for q in [*main,*backup,*result.get('aplus_qa',[])]}
+    covered={i for q in linked.values() for i in [*q.get('covered_question_ids',[]),*q.get('candidate_question_ids',[])]}
     unused=sheet('备选原问',['原问ID','方向','完整原问','来源ASIN','选题记录'],[
         [q['id'],q.get('topic',''),q['text'],q.get('asins',[]),q.get('selection',[])]
         for q in result.get('original_questions',[]) if q['id'] not in covered
         and q.get('applicability',{}).get('status')!='exclude'
         and q.get('applicability',{}).get('copy_status')!='exclude'
         and not any(d.get('status')=='不适用建议' for d in q.get('selection',[]))])
-    plans[2]=qa_sheets({**result,'qa':[*main,*backup]})[2]
+    plans[2]=qa_sheets({**result,'qa':list(linked.values())})[2]
     extras=[]
     if result.get('excluded_qa'):
         excluded=qa_sheets({'qa':result['excluded_qa']})[0];excluded['name']='已排除QA留档'
-        excluded['headers'].append('排除原因')
-        for row,q in zip(excluded['rows'],result['excluded_qa']):row.append(q.get('exclusion_reason',''))
+        excluded['headers'].extend(['排除位置','排除原因'])
+        for row,q in zip(excluded['rows'],result['excluded_qa']):row.extend([q.get('excluded_target',''),q.get('exclusion_reason','')])
         extras.append(excluded)
     return [plans[0],reserve,unused,plans[1],*plans[2:],*extras]
 

@@ -62,5 +62,31 @@ class QaDeliveryTests(unittest.TestCase):
         tabs={s['name']:s for s in delivery_sheets(result)}
         self.assertIn('已排除QA留档',tabs)
 
+    def test_unused_aplus_brand_does_not_discard_clean_main_qa(self):
+        draft={'qa_id':'a','topic':'fit','question_en':'How wide is the frame?','answer_en':'The frame is 140 mm wide.','aplus_answer_en':'ViewJoy draft.'}
+        with tempfile.TemporaryDirectory() as d:
+            result=curate({'qa':[draft]},{'excluded_brands':['ViewJoy']},'test',Path(d)/'selection.json',lambda *a:({'main_ids':['a'],'aplus_ids':[]},{}),lambda:'test')
+        self.assertEqual(len(result['qa']),1)
+        self.assertEqual(result['excluded_qa'],[])
+
+    def test_aplus_subtitle_is_checked_separately_from_main_qa(self):
+        draft={'qa_id':'a','topic':'fit','question_en':'How wide is the frame?','answer_en':'The frame is 140 mm wide.','aplus_subtitle_en':'ViewJoy design','aplus_answer_en':'A clean detailed answer.'}
+        with tempfile.TemporaryDirectory() as d:
+            result=curate({'qa':[draft]},{'excluded_brands':['ViewJoy']},'test',Path(d)/'selection.json',lambda *a:({'main_ids':['a'],'aplus_ids':['a']},{}),lambda:'test')
+        self.assertEqual(len(result['qa']),1)
+        self.assertEqual(result['aplus_qa'],[])
+        self.assertEqual(result['excluded_qa'][0]['excluded_target'],['A+'])
+
+    def test_clean_aplus_keeps_source_link_when_main_answer_is_filtered(self):
+        draft={'qa_id':'a','topic':'fit','question_en':'How wide is the frame?','answer_en':'A ViewJoy draft.','aplus_answer_en':'The frame is 140 mm wide.','covered_question_ids':['q']}
+        original={'id':'q','text':'How wide is the frame?','asins':['OWN']}
+        with tempfile.TemporaryDirectory() as d:
+            result=curate({'qa':[draft],'original_questions':[original]},{'excluded_brands':['ViewJoy']},'test',Path(d)/'selection.json',lambda *a:({'main_ids':['a'],'aplus_ids':['a']},{}),lambda:'test')
+        self.assertEqual(result['qa'],[])
+        self.assertEqual(len(result['aplus_qa']),1)
+        tabs={p['name']:p for p in delivery_sheets(result)}
+        self.assertEqual(tabs['原问关联']['rows'][0][0],'a')
+        self.assertEqual(tabs['原问关联']['rows'][0][2],['q'])
+
 
 if __name__=='__main__':unittest.main()
