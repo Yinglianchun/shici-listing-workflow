@@ -10,6 +10,20 @@ from excel_export import portable_excel
 
 
 class MasterWorkbookTests(unittest.TestCase):
+    def test_four_workbooks_ask_missing_facts_without_pending_sheets(self):
+        from product_workbook import product_sheets
+        self.assertNotIn('待补资料',{p['name'] for p in product_sheets({'asin':'OWN'},{'missing_information':[{'item':'镜片材质','reason':'未提供'}]})})
+        self.assertNotIn('待确认素材',{p['name'] for p in blank_master_sheets(False)})
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d)
+            records={'job.json':{'report_mode':'four-workbooks','product':{'asin':'OWN'}},
+                'stage1.json':{'sources':[],'groups':[{'group_id':'g','text':'TAC sunglasses','kind':'keyword','sources':[],'asins':[]}]},
+                'stage4.json':{'g':{'status':'pending','reason':'材质未提供','missing_information':['镜片是否TAC']}}}
+            for name,value in records.items():(root/name).write_text(json.dumps(value),encoding='utf-8')
+            tabs={p['name']:p for p in build_master(root)}
+            self.assertNotIn('待确认素材',tabs)
+            self.assertTrue((root/'stage4.json').exists())
+
     def test_copy_rejection_is_not_reported_as_product_mismatch(self):
         with tempfile.TemporaryDirectory() as d:
             root=Path(d)

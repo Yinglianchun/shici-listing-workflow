@@ -10,7 +10,7 @@ def product_sheets(product=None,analysis=None):
     product=product or {};analysis=analysis or {}
     plans=[sheet('本品完整资料',['ASIN','标题','页面原文','用户确认补充','当前主推子体','待补信息'],
         [[product.get('asin',''),product.get('title',''),product.get('raw_details',product.get('facts',{})),product.get('confirmed_supplements',''),product.get('selected_variant',''),product.get('pending_questions',[])]] if product else [],column_widths=[16,38,60,48,24,36])]
-    plans.extend(analysis_sheets(analysis))
+    plans.extend(p for p in analysis_sheets(analysis) if p['name']!='待补资料')
     plans.extend([
         sheet('页面与补充口径',['字段或卖点','页面位置','页面原文','补充内容与来源','适用ASIN或子体','当前确认口径','状态'],[
             [r.get(k,'') for k in ('field','location','page_quote','supplement','variant','confirmed_value','status')]

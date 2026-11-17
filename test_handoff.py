@@ -36,7 +36,7 @@ class HandoffTests(unittest.TestCase):
             self.assertIn('stage4.json',prompt)
             self.assertIn('人工续做/表格/',prompt)
 
-    def test_new_order_handoff_after_sorting_runs_dedup_before_screening(self):
+    def test_legacy_handoff_keeps_its_indices_and_copies_current_skill(self):
         from handoff import NEW_STAGE_NAMES
         with tempfile.TemporaryDirectory() as directory:
             folder=Path(directory)
@@ -47,7 +47,8 @@ class HandoffTests(unittest.TestCase):
             self.assertIn('03 高重合素材去重',result['prompt'])
             self.assertIn('完整包含',result['prompt'])
             copied=(folder/'使用的Skill/listing-material-workflow/SKILL.md').read_text(encoding='utf-8')
-            self.assertIn('03高重合素材去重 → 04本品适用性筛选',copied)
+            self.assertIn('03本品适用性筛选 → 04高重合素材去重',copied)
+            self.assertIn('旧程序',copied)
 
     def test_each_stage_points_to_its_required_existing_outputs(self):
         with tempfile.TemporaryDirectory() as directory:

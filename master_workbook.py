@@ -42,7 +42,7 @@ def blank_master_sheets(product_sections=True):
     ])
     for p in analysis_sheets({}):plans.append(sheet(p['name'],p['headers'],widths=p.get('column_widths')))
     if not product_sections:
-        plans=[p for p in plans if p['name'] not in {'本品资料','本品分析','资料差异','待补资料'}]
+        plans=[p for p in plans if p['name'] not in {'本品资料','本品分析','资料差异','待补资料','待确认素材'}]
         plans[0]['note']='按当前子体及已确认投放策略维护；本次不投不等于本品没有该特性，原文保留。'
         plans.append(sheet('04b_本次投放排除',['Keyword','类型','本品事实判断','投放处理','原因','适用子体','文案处理','来源ASIN'],note='本次不投不等于本品没有该特性；可按已确认子体和策略恢复。'))
     return plans
@@ -122,7 +122,7 @@ def build_master(folder,stage=0):
             a=assessments.get(identifier,{})
             m=metadata(g,a)
             tabs['已剔除-附原因']['rows'].append([g['text'],g['kind'],decision.get('reason',''),m[0],m[1],m[2],m[3],m[4],g.get('asins',[])])
-        elif status=='pending':tabs['待确认素材']['rows'].append([g['text'],g['kind'],decision.get('reason',''),decision.get('missing_information',[]),g.get('asins',[])])
+        elif status=='pending' and '待确认素材' in tabs:tabs['待确认素材']['rows'].append([g['text'],g['kind'],decision.get('reason',''),decision.get('missing_information',[]),g.get('asins',[])])
         elif status=='variant_only':tabs['子体备用']['rows'].append([g['text'],g['kind'],decision.get('variant',''),decision.get('reason',''),decision.get('basis',''),g.get('asins',[])])
     final=read(folder,'stage9.json',read(folder,'stage8.json',{}))
     for r in final.get('negative_keyword_candidates',[]):
