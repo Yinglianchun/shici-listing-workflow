@@ -12,6 +12,18 @@ helper=runpy.run_path(str(SCRIPT))
 
 
 class SkillCleaningTests(unittest.TestCase):
+    def test_brand_stripping_preserves_properties_and_originals(self):
+        from ad_policy import strip_brand_names
+        text='SOJOS polarized aviator sunglasses for women'
+        cleaned,removed=strip_brand_names(text,['SOJOS'])
+        self.assertEqual(cleaned,'polarized aviator sunglasses for women')
+        self.assertEqual(removed,['SOJOS'])
+        self.assertEqual(strip_brand_names('VIVIENFANG sunglasses',['SOJOS'])[0],'VIVIENFANG sunglasses')
+        rows=[{'Keyword':text,'Type':'关键词'},{'Keyword':'polarized aviator sunglasses for women','Type':'关键词'}]
+        result=helper['process'](rows,'strip-brands',['SOJOS'])
+        self.assertEqual(result['kept_rows'],1)
+        self.assertEqual(result['records'][0]['originals'],rows)
+        self.assertIn('polarized',result['records'][0]['row']['Keyword'])
     def test_spelling_order_and_lineage_without_losing_qualifiers(self):
         rows=[{'Keyword':t,'Type':'关键词','ASIN':str(i)} for i,t in enumerate([
             'women sunglasses','sunglasses womens',"women's sunglasses",'women’s sunglasses',

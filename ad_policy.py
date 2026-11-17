@@ -9,6 +9,18 @@ def matched_brand(text,brands):
     return None
 
 
+def strip_brand_names(text,brands):
+    """Remove named brand tokens only; product suitability must be assessed later."""
+    cleaned=str(text);removed=[]
+    for brand in brands or []:
+        letters=[re.escape(c) for c in str(brand) if c.isalnum()]
+        if not letters:continue
+        pattern=r'(?<!\w)'+r'[\W_]*'.join(letters)+r'(?!\w)'
+        cleaned,count=re.subn(pattern,' ',cleaned,flags=re.I)
+        if count:removed.append(str(brand))
+    return re.sub(r'\s+',' ',cleaned).strip(),removed
+
+
 def apply_brand_exclusions(groups,decisions,product):
     results={i:dict(r) for i,r in decisions.items()}
     for g in groups:

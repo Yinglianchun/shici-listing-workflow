@@ -32,7 +32,17 @@ def ad_text(text):
     return re.sub(r'\s+',' ',text.replace("'",'').replace(',',' ')).strip(),''
 
 
-def process(rows,mode):
+def strip_brands(text,brands):
+    cleaned=str(text);removed=[]
+    for brand in brands:
+        letters=[re.escape(c) for c in str(brand) if c.isalnum()]
+        if not letters:continue
+        cleaned,count=re.subn(r'(?<!\w)'+r'[\W_]*'.join(letters)+r'(?!\w)',' ',cleaned,flags=re.I)
+        if count:removed.append(str(brand))
+    return re.sub(r'\s+',' ',cleaned).strip(),removed
+
+
+def process(rows,mode,brands=None):
     groups={};pending=[]
     for index,source in enumerate(rows,1):
         source=dict(source)
@@ -42,6 +52,11 @@ def process(rows,mode):
         kind=source.get('kind') or source.get('Type') or 'unknown'
         kind={'关键词':'keyword','买家问句':'question','ai_generated_question':'question'}.get(kind,kind)
         output=dict(source)
+        if mode=='strip-brands':
+            cleaned,removed=strip_brands(text,brands or [])
+            if not cleaned:
+                pending.append({'row':index,'original':source,'reason':'去品牌后没有有效表达，原文保留待核对'});continue
+            output['Keyword']=cleaned;output['RemovedBrands']=removed
         if mode=='ad-a':
             cleaned,reason=ad_text(text)
             if cleaned is None:
@@ -68,14 +83,18 @@ def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--input',required=True,help='CSV or JSON array with Keyword, optional Type/kind and sheet')
     parser.add_argument('--output',required=True,help='New JSON result; source files are never overwritten')
-    parser.add_argument('--mode',choices=['dedup','ad-a'],required=True)
+    parser.add_argument('--mode',choices=['dedup','ad-a','strip-brands'],required=True)
+    parser.add_argument('--brands',help='JSON array of confirmed third-party brand names; never include own brand')
     args=parser.parse_args();source=Path(args.input);target=Path(args.output)
     if source.resolve()==target.resolve() or target.exists():raise ValueError('输出必须是尚不存在的新文件')
     if source.suffix.lower()=='.csv':
         with source.open(encoding='utf-8-sig',newline='') as stream:rows=list(csv.DictReader(stream))
     else:rows=json.loads(source.read_text(encoding='utf-8-sig'))
     if not isinstance(rows,list):raise ValueError('JSON输入必须是行对象数组')
-    result=process(rows,args.mode)
+    brands=json.loads(Path(args.brands).read_text(encoding='utf-8-sig')) if args.brands else []
+    if not isinstance(brands,list) or any(not isinstance(v,str) for v in brands):raise ValueError('品牌文件必须是品牌名称字符串数组')
+    if args.mode=='strip-brands' and not args.brands:raise ValueError('去品牌模式需要--brands品牌清单')
+    result=process(rows,args.mode,brands)
     target.parent.mkdir(parents=True,exist_ok=True)
     target.write_text(json.dumps(result,ensure_ascii=False,indent=2),encoding='utf-8')
     print(json.dumps({k:result[k] for k in ['mode','input_rows','kept_rows','removed_duplicates']},ensure_ascii=False))
