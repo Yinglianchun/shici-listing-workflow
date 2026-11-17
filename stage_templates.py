@@ -14,7 +14,7 @@ def templates():
       '素材总表空模板.xlsx':blank_master_sheets(),
       '投放分级关键词与问句空模板.xlsx':blank_master_sheets(False),
       '本品资料与页面改动建议空模板.xlsx':empty(product_sheets()),
-      '描述素材空模板.xlsx':empty(description_sheets(final)),
+      '描述素材空模板.xlsx':empty(description_sheets({**final,'description_groups':[]})),
       'QA与A+问答空模板.xlsx':empty(delivery_sheets({'qa':[],'original_questions':[]})),
       '00_本品分析.xlsx':empty(analysis_sheets({})),
       '00_本品资料.xlsx':[blank('本品完整资料',['ASIN','标题','完整详情','待确认事项','资料来源'])],

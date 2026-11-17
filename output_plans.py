@@ -54,6 +54,11 @@ def prefix_sheets(final):
     return plans
 
 def description_sheets(final):
+    if 'description_groups' in final:
+        return [sheet('描述草稿',['描述素材','实际字符数','每组上限','组号','目标ASIN','父体或子体','适用范围','分配状态'],
+            [[g['description'],len(g['description']),final['description_limit'],g['group_id'],g.get('target_asin',''),g.get('target_type',''),g.get('applicability',''),g.get('assignment_status','待分配')] for g in final['description_groups']],layout='description'),
+            sheet('采用明细',['等级','文本','格式','素材ID','组号'],[[r['level'],r['text'],r['format'],r.get('material_ids',[]),r['group_id']] for r in sorted(final['description_selection'],key=level_key)]),
+            sheet('待整理素材',['等级','文本','格式','素材ID','原因'],[[r['level'],r['text'],r['format'],r.get('material_ids',[]),r['reason']] for r in final.get('description_unassigned',[])])]
     return [sheet('描述草稿',['描述素材','实际字符数','字符上限'],[[final['description'],len(final['description']),final['description_limit']]],layout='description'),
         sheet('采用明细',['等级','文本','格式','素材ID'],[[r['level'],r['text'],r['format'],r.get('material_ids',[])] for r in sorted(final['description_selection'],key=level_key)])]
 

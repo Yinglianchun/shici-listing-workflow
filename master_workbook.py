@@ -137,7 +137,8 @@ def build_master(folder,stage=0):
            ['待确认代表','','',pending],['删除留档的待确认原文','','',deleted_pending]]
     for name in GRADE_NAMES:stats.append([name,len(tabs[name+'-关键词']['rows']),len(tabs[name+'-问句']['rows']),'精准否定候选' if name=='0-1级' else '正向候选'])
     for i,s in enumerate(read(folder,'status.json',{}).get('steps',[]),1):stats.append([f'{i:02d} '+s.get('name',''),'','', '已完成' if i==stage or s.get('state')=='done' else s.get('state','pending')])
-    stats.extend([['QA','','',len(qa.get('qa',[]))],['描述字符数','','',len(final.get('description',''))],['字符上限','','',cfg.get('max_characters',9000)]])
+    stats.extend([['QA','','',len(qa.get('qa',[]))],['描述字符数','','',final.get('description_total_characters',len(final.get('description','')))],['每组字符上限' if suite else '字符上限','','',cfg.get('max_characters',9000)]])
+    if suite:stats.append(['描述组数','','',len(final.get('description_groups',[]))])
     tabs['统计摘要']['rows']=stats
     tabs['统计摘要']['title']=cfg.get('export_prefix',product.get('asin','ASIN'))+(' · 投放分级关键词与问句' if suite else ' · 素材总表')
     for name in GRADE_NAMES:

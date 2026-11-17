@@ -29,6 +29,34 @@ def assemble(candidates,limit=9000):
     return '; '.join(c['text'] for c in selected),selected
 
 
+def assemble_groups(candidates,limit=9000):
+    """Pack intact approved phrases into as many groups as needed."""
+    if limit<1:raise ValueError('每组字符上限必须大于0')
+    unique={};pending=[]
+    for candidate in candidates:
+        text=re.sub(r'\s+',' ',candidate['text']).strip()
+        if not text:continue
+        key=normalize(text)
+        if key in unique:
+            previous=unique[key]
+            previous['material_ids']=list(dict.fromkeys(previous.get('material_ids',[])+candidate.get('material_ids',[])))
+            previous['priority']=min(previous['priority'],candidate['priority'])
+        else:unique[key]={**candidate,'text':text}
+    groups=[]
+    for row in sorted(unique.values(),key=lambda c:(c['priority'],c.get('level',99),len(c['text']))):
+        if len(row['text'])>limit:
+            pending.append({**row,'reason':'单条超过每组上限，需重新整理；未截断'})
+            continue
+        if not groups or len(groups[-1]['description'])+2+len(row['text'])>limit:
+            groups.append({'group_id':len(groups)+1,'description':'','selection':[],
+                'target_asin':'','target_type':'','applicability':'','assignment_status':'待分配'})
+        group=groups[-1]
+        group['description']+=('; ' if group['selection'] else '')+row['text']
+        group['selection'].append({**row,'group_id':group['group_id']})
+        group['characters']=len(group['description'])
+    return groups,pending
+
+
 def build(groups,assessments,applicability,judgments,qa,own_asin,limit,compose=True):
     by_id={g['group_id']:g for g in groups}
     eligible=[g for g in groups if applicability.get(g['group_id'],{}).get('status')=='eligible']

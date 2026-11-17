@@ -2,7 +2,7 @@
 import re
 from cleaner import normalize
 from applicability import assess
-from materials import assemble
+from materials import assemble,assemble_groups
 from keyword_layout import keyword_identity
 from ad_policy import matched_brand
 
@@ -111,7 +111,7 @@ def final_comparison(materials,product,cache,model):
     return output,stats
 
 
-def compose_reviewed(reviews,limit=9000):
+def compose_reviewed(reviews,limit=9000,multi_group=False):
     passed=[r['material'] for r in reviews if r['review'].get('status')=='eligible' and r['material'].get('level') is not None]
     keywords=[];seen=set();description_items=[]
     for row in sorted(passed,key=lambda r:(r['level'],r['text'].casefold())):
@@ -132,6 +132,19 @@ def compose_reviewed(reviews,limit=9000):
     candidates=[{'text':g['text'],'priority':min(m['priority'] for m in g['members']),
         'level':min(m['level'] for m in g['members']),'format':g['members'][0]['format'],
         'material_ids':[m['material_id'] for m in g['members']]} for g in compact]
-    text,selection=assemble(candidates,limit)
-    return {'advertising_keywords':keywords,'prefix_groups':compact,'description':text,'description_selection':selection,
+    extras={}
+    if multi_group:
+        # Unpack an oversized prefix group before packing; preserve its full members.
+        expanded=[]
+        for candidate,group in zip(candidates,compact):
+            if len(candidate['text'])<=limit:expanded.append(candidate)
+            else:
+                expanded.extend({**m,'material_ids':[m['material_id']]} for m in group['members'])
+        groups,pending=assemble_groups(expanded,limit)
+        text=groups[0]['description'] if groups else ''
+        selection=[r for g in groups for r in g['selection']]
+        extras={'description_groups':groups,'description_unassigned':pending,
+            'description_total_characters':sum(g['characters'] for g in groups)}
+    else:text,selection=assemble(candidates,limit)
+    return {**extras,'advertising_keywords':keywords,'prefix_groups':compact,'description':text,'description_selection':selection,
         'reviewed_count':len(reviews),'passed_count':len(passed),'description_characters':len(text),'description_limit':limit}

@@ -4,6 +4,42 @@ from finalize import prefix_groups,compose_reviewed,merge_product_reviews,final_
 
 
 class FinalizeTests(unittest.TestCase):
+    def test_multi_group_keeps_all_material_beyond_9000(self):
+        from output_plans import description_sheets
+        reviews=[]
+        for i in range(120):
+            text=f'feature{i} '+('durable material ' * 6)
+            reviews.append({'material':{'material_id':str(i),'kind':'keyword','level':2,'sources':[str(i)],
+                'qa_used':False,'text':text,'phrase':'','asins':['COMPETITOR']},'review':{'status':'eligible'}})
+        result=compose_reviewed(reviews,multi_group=True)
+        self.assertGreater(result['description_total_characters'],9000)
+        self.assertGreater(len(result['description_groups']),1)
+        self.assertEqual({i for r in result['description_selection'] for i in r['material_ids']},{str(i) for i in range(120)})
+        for g in result['description_groups']:
+            self.assertLessEqual(len(g['description']),9000)
+            self.assertEqual(g['target_asin'],'')
+            self.assertEqual(g['assignment_status'],'待分配')
+        plans=description_sheets(result)
+        self.assertEqual(len(plans[0]['rows']),len(result['description_groups']))
+        self.assertEqual(plans[1]['headers'][-1],'组号')
+
+    def test_group_boundary_and_duplicate_lineage(self):
+        from materials import assemble_groups
+        def row(text,i):return {'text':text,'priority':1,'level':2,'material_ids':[i]}
+        groups,pending=assemble_groups([row('abc',1),row('ABC',2),row('def',3),row('ghi',4)],8)
+        self.assertEqual([g['description'] for g in groups],['abc; def','ghi'])
+        self.assertEqual(groups[0]['selection'][0]['material_ids'],[1,2])
+        self.assertFalse(pending)
+
+    def test_oversized_prefix_is_unpacked_and_long_single_is_retained(self):
+        def row(i,text):return {'material':{'material_id':i,'kind':'keyword','level':2,'sources':[i],
+            'qa_used':False,'text':text,'phrase':''},'review':{'status':'eligible'}}
+        words=['polarized photochromic sunglasses for men driving','polarized photochromic sunglasses for men fishing']
+        result=compose_reviewed([row(str(i),t) for i,t in enumerate(words)]+[row('long','x'*100)],50,multi_group=True)
+        self.assertEqual({i for r in result['description_selection'] for i in r['material_ids']},{'0','1'})
+        self.assertEqual(result['description_unassigned'][0]['material_ids'],['long'])
+        self.assertEqual(result['description_unassigned'][0]['text'],'x'*100)
+
     def test_question_key_expression_can_be_rephrased_without_overwriting_original(self):
         text='How fast do these photochromic sunglasses change tint?'
         original={'material_id':'q','kind':'ai_generated_question','level':1,'sources':['s'],'qa_used':False,

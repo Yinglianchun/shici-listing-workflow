@@ -104,7 +104,10 @@ def public_job(identifier,stage=None,search=''):
         elif int(stage)==7 and (folder/'stage7.json').exists():
             reviews=read(folder/'stage7.json')
             result['preview']=[{'name':'合并前自查','headers':['素材ID','原文','建议','原因'],'rows':[[r['material']['material_id'],r['material']['text'],r['review'].get('status'),r['review'].get('reason')] for r in reviews],'total':len(reviews)}]
-    if (folder/'stage9.json').exists():result['description']=read(folder/'stage9.json')['description']
+    if (folder/'stage9.json').exists():
+        final=read(folder/'stage9.json')
+        result['description']=final['description']
+        result['description_groups']=final.get('description_groups',[])
     if stage and int(stage)==7 and (folder/'review_decisions.json').exists():
         decisions=read(folder/'review_decisions.json')
         for plan in result['preview']:

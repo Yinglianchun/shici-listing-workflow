@@ -210,7 +210,7 @@ def run(folder,until=9,compose_only=False):
         done(5,keyword_sheets(graded,groups,imported['sources'],final_app,dedup['representatives'],product))
         done(7,cleaned_question_sheets(reviews,graded))
         if until==7:return
-        begin(8);final=compose_reviewed(reviews,cfg['max_characters'])
+        begin(8);final=compose_reviewed(reviews,cfg['max_characters'],multi_group=suite)
         if suite:
             final['advertising_keywords']=advertising_from_grades(graded,final_app,dedup['representatives'],reviews)
         negative_app=dict(final_app if suite else app)
@@ -231,7 +231,7 @@ def run(folder,until=9,compose_only=False):
         elif suite:pass
         else:named_file(folder,'09_商品描述素材草稿.txt' if cfg.get('export_prefix') else '商品描述素材草稿.txt').write_text(final['description'],encoding='utf-8')
         done(9,description_sheets(final))
-        status['summary']={'keywords':sum(r['level']>=2 for r in final['advertising_keywords']) if single else len(final['advertising_keywords']),'characters':len(final['description']),'passed':final['passed_count'],'reviewed':final['reviewed_count']}
+        status['summary']={'keywords':sum(r['level']>=2 for r in final['advertising_keywords']) if single else len(final['advertising_keywords']),'characters':final.get('description_total_characters',len(final['description'])),'description_groups':len(final.get('description_groups',[])),'passed':final['passed_count'],'reviewed':final['reviewed_count']}
     except Exception as error:status.update(state='failed',error=str(error));raise
     finally:
         if status['state']=='running':status['state']='completed' if until>=9 else 'paused'
