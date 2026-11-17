@@ -1,6 +1,6 @@
 """Fixed keyword workbook layout, matching the user's reference without its overview."""
 from collections import Counter,defaultdict
-from cleaner import normalize
+from cleaner import normalize,comparison_text
 import re
 from ad_policy import matched_brand
 
@@ -13,7 +13,7 @@ TABS=['L0_核心泛词','一级词','二级词','三级词','四级及以上词'
 def sheet(name,headers,rows):return {'name':name,'headers':headers,'rows':rows,'layout':'keyword_reference',
     'column_widths':[8,66,33,11,60,17] if headers==TERM_HEADERS else [36,22,28,18,32]}
 
-def keyword_identity(text):return tuple(sorted(re.findall(r"[\w'-]+",normalize(text))))
+def keyword_identity(text):return tuple(sorted(re.findall(r"[\w'-]+",comparison_text(text))))
 
 def attribute_details(attributes):
     details=[]

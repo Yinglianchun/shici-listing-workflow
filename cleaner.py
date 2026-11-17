@@ -17,6 +17,11 @@ def normalize(text):
     return re.sub(r'\s+', ' ', text).strip().rstrip('?.!').strip()
 
 
+def comparison_text(text):
+    """Collapse confirmed women spelling variants for comparison, not display."""
+    return re.sub(r"(?<![\w'])women(?:'s|s)?(?![\w'])",'women',normalize(text))
+
+
 def phrase(text):
     """Extract a key-expression draft at any length; retain meaningful relationships."""
     text = normalize(text)
@@ -67,7 +72,7 @@ def deduplicate(records):
     for record in records:
         raw = record['raw']
         # Marketplace and content kind do not silently collapse together.
-        key = (raw.get('Marketplace', '').strip().upper(), record['kind'], raw['Type'].strip(), normalize(raw['Keyword']))
+        key = (raw.get('Marketplace', '').strip().upper(), record['kind'], raw['Type'].strip(), comparison_text(raw['Keyword']))
         if key not in groups:
             groups[key] = {'group_id': f'G{len(groups)+1:06}', 'kind': record['kind'],
                            'marketplace': key[0], 'text': raw['Keyword'], 'normalized': key[3],

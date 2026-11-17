@@ -20,7 +20,7 @@ class GradingTests(unittest.TestCase):
                ('gold frame ',[attribute('frame_color','gold','gold frame')],1),
                ('gold full frame ',[attribute('frame_color','gold','gold'),attribute('frame_structure','full frame','full frame')],2)]
         for prefix,attrs,expected in cases:
-            for spelling in (core,'women’s sunglasses'):
+            for spelling in (core,'women’s sunglasses','women sunglasses','womens sunglasses'):
                 with self.subTest(text=prefix+spelling):
                     item={'id':'A','text':prefix+spelling,'kind':'keyword','core_candidates':[core]}
                     result=normalize_assessment(row('A',core,[*attrs,attribute('gender','women','women')]),item)

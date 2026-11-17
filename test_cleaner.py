@@ -11,6 +11,23 @@ def source(number, text, asin='B0BW8JZ279', kind='ai_generated_question', market
 
 
 class CleanerTests(unittest.TestCase):
+    def test_women_spellings_merge_with_sources_but_new_attributes_survive(self):
+        from keyword_layout import keyword_identity
+        spellings=['women','womens',"women's",'women’s']
+        for kind in ['keyword','ai_generated_question']:
+            records=[source(i,word+' sunglasses',asin='ASIN'+str(i),kind=kind) for i,word in enumerate(spellings)]
+            records.append(source(4,'gold frame womens sunglasses',kind=kind))
+            groups=deduplicate(records)
+            self.assertEqual(len(groups),2)
+            self.assertEqual(groups[0]['text'],'women sunglasses')
+            self.assertEqual(len(groups[0]['variants']),4)
+            self.assertEqual(len(groups[0]['sources']),4)
+            self.assertEqual(len(groups[0]['asins']),4)
+        self.assertEqual(keyword_identity('women sunglasses'),keyword_identity('sunglasses women’s'))
+        self.assertNotEqual(keyword_identity('womenswear sunglasses'),keyword_identity('women sunglasses'))
+        self.assertNotEqual(keyword_identity('men sunglasses'),keyword_identity('women sunglasses'))
+        self.assertNotEqual(keyword_identity('women sunglasses without case'),keyword_identity('women sunglasses with case'))
+
     def test_negative_contractions_survive_phrase_cleaning(self):
         for text in ["Can't these sunglasses fit over prescription glasses?",
                      "Won’t these sunglasses darken?", "Do these glasses not darken?",

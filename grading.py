@@ -9,7 +9,7 @@ from collections import Counter
 from concurrent.futures import ThreadPoolExecutor,as_completed
 from contextlib import closing
 from pathlib import Path
-from cleaner import normalize,write_csv
+from cleaner import normalize,comparison_text,write_csv
 from judge import request_json,DEFAULT_MODEL,TOPICS
 from semantic import read_api_key
 
@@ -85,7 +85,7 @@ def normalize_assessment(row,item):
     raw_response=dict(row)
     text=item['text']
     core=row.get('core_term') if isinstance(row.get('core_term'),str) else None
-    core=next((candidate for candidate in item['core_candidates'] if normalize(candidate)==normalize(core or '')),core)
+    core=next((candidate for candidate in item['core_candidates'] if comparison_text(candidate)==comparison_text(core or '')),core)
     row={**row,'id':item['id'],'core_term':core,'raw_response':raw_response}
     for key in ('intent','intent_concept','review_reason'):
         if not isinstance(row.get(key),str):row[key]=''
@@ -99,7 +99,8 @@ def normalize_assessment(row,item):
     attributes={};excluded=[];structure=[]
     quote_map=str.maketrans({'’':"'",'‘':"'"})
     span_text=text.translate(quote_map)
-    core_spans=[match.span() for match in re.finditer(re.escape((core or '').translate(quote_map)),span_text,re.I)] if core else []
+    core_pattern=re.sub(r'\bwomen\b',lambda _:r"women(?:'s|s)?",re.escape(comparison_text(core or '')))
+    core_spans=[match.span() for match in re.finditer(core_pattern,span_text,re.I)] if core else []
     for attribute in row['attributes']:
         if not isinstance(attribute,dict):
             continue
@@ -139,7 +140,7 @@ def normalize_assessment(row,item):
             entry['labels'].append('形状（原文直接识别）')
     unresolved=list(row['unresolved'])
     if item.get('kind')=='keyword':
-        tokenize=lambda value:set(re.findall(r"[a-z]+(?:'[a-z]+)*|\d+(?:\.\d+)?",normalize(value)))
+        tokenize=lambda value:set(re.findall(r"[a-z]+(?:'[a-z]+)*|\d+(?:\.\d+)?",comparison_text(value)))
         covered=tokenize(core or '')
         for attribute in attributes.values():
             for span in attribute['evidence']:

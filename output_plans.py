@@ -1,6 +1,6 @@
 """Reader-facing outputs contain usable material; review details stay in stage JSON."""
 import re
-from cleaner import normalize
+from cleaner import normalize,comparison_text
 from keyword_layout import attribute_details
 
 def sheet(name,headers,rows,**options):return {'name':name,'headers':headers,'rows':rows,**options}
@@ -36,7 +36,7 @@ def cleaned_question_sheets(reviews,graded):
     for level,name in enumerate(['L0_整理后问句','一级问句','二级问句','三级问句','四级及以上问句']):
         rows=[];seen=set()
         for m in good:
-            text=normalize(m['phrase'])
+            text=comparison_text(m['phrase'])
             if bucket(m['level'])!=level or not text or re.match(r'^how\b',text) or text in seen:continue
             seen.add(text);a=next((assessments[i] for i in m['member_ids'] if i in assessments),{})
             rows.append([len(rows)+1,m['phrase'],m['text'],a.get('core_term',''),m['level'],attribute_details(a.get('attributes',[])),a.get('topic',''),'建议否定' if m['level']<=1 else '待人工确定'])

@@ -4,7 +4,7 @@ import json
 import re
 from collections import Counter
 from pathlib import Path
-from cleaner import normalize,phrase,write_csv
+from cleaner import normalize,comparison_text,phrase,write_csv
 from intents import propose_intents
 
 
@@ -36,7 +36,7 @@ def assemble_groups(candidates,limit=9000):
     for candidate in candidates:
         text=re.sub(r'\s+',' ',candidate['text']).strip()
         if not text:continue
-        key=normalize(text)
+        key=comparison_text(text)
         if key in unique:
             previous=unique[key]
             previous['material_ids']=list(dict.fromkeys(previous.get('material_ids',[])+candidate.get('material_ids',[])))
