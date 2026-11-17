@@ -10,7 +10,7 @@ date=datetime.now(timezone(timedelta(hours=8))).strftime('%Y-%m-%d')
 def skill_files():
     base=ROOT/'skills/listing-material-workflow'
     return [(p,p.relative_to(base).as_posix()) for p in sorted(base.rglob('*'))
-        if p.is_file() and p.suffix in ('.md','.yaml','.yml','.xlsx') and '__pycache__' not in p.parts]
+        if p.is_file() and (p.suffix in ('.md','.yaml','.yml','.xlsx') or (p.suffix=='.txt' and 'scripts' in p.relative_to(base).parts)) and '__pycache__' not in p.parts]
 app=[]
 for p in sorted(ROOT.glob('*.py')):
     if not p.name.startswith('test_'):app.append((p,p.name))

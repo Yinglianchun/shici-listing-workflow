@@ -149,8 +149,8 @@ def write_four_handoff(folder,cfg):
     outputs=[named_file(folder,name).relative_to(folder).as_posix() for name in ['本品资料与页面改动建议.xlsx','QA与A+问答.xlsx','投放分级关键词与问句.xlsx','描述素材.xlsx']]
     lines=[f'请由当前agent直接使用 listing-material-workflow Skill 接着处理：{folder}',
         '先读使用的Skill/listing-material-workflow/SKILL.md及references/stages.md、references/applicability-and-advertising.md，再读product.json及现有四份Excel；有人工续做/续做记录.md时优先按它的最新进度，不重做已完成部分。',
-        '当前agent自己阅读、判断和写作，不运行本地语义工作流脚本，不调用其他LLM API代跑；文件工具只辅助读写、排序、基础统计和保存Excel。',
-        '一轮只完成一个步骤：落表、更新续做记录、给下一步提示后停下等用户继续；缺00分析时本轮只补00，不连做03。先完成分级与广告词库，再做独立QA，最后描述。旧程序stage6/7/8对应QA/清洗/广告与前缀，按实际内容映射新Skill步骤。',
+        '当前agent自己阅读、判断和写作，不运行本地语义工作流脚本，不调用其他LLM API代跑；文件工具只辅助读写、排序、基础统计和保存Excel；可运行Skill自带clean_materials.py.txt做机械清洗，不调用LLM，详见references/mechanical-cleaning.md。',
+        '一轮只完成一个步骤：落表、更新续做记录、给下一步提示后停下等用户继续；缺00分析时本轮只补00，不连做03。先汇总全部CSV、用户此前/当前清单和参考表的核心词并补泛词、固定口径，再分级完成广告词库，然后独立QA，最后描述。旧程序stage6/7/8对应QA/清洗/广告与前缀，按实际内容映射新Skill步骤。',
         '分级时补齐本品适用的常用类目词、同义类目表达及有依据的常见一级词，不仅收原CSV裸词；写回实际等级页，Evidence注明本品资料归纳及依据，不编原CSV次数或搜索量，不设最低词量，不把新增词全塞0级。',
         '信息不足必须主动追问。没有本品资料或可读取的ASIN/链接时先问商品和主推子体；只有ASIN/链接先尝试读取，失败再请用户补充标题、五点和参数。缺关键属性或口径冲突时具体提问，答复前相关素材待确认，暂缓依赖这些信息的判断和正式文案，不猜补、不把未提供当作没有；机械整理及依据充分的部分可继续。',
         "women、womens、women's、women’s为同一种表达，其余信息相同时只保留一个，原始拼写和来源留档；核心词匹配与等级不因该拼写变化而改变。有新增属性或条件仍保留，不对其他英文词一律删s。",

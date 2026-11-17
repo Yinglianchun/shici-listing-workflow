@@ -1,0 +1,84 @@
+"""Optional mechanical helper. Run with Python; no packages, network or LLM calls."""
+import argparse
+import csv
+import json
+import re
+import unicodedata
+from pathlib import Path
+
+
+def normalized(text):
+    text=unicodedata.normalize('NFKC',str(text)).casefold()
+    text=text.translate(str.maketrans({'’':"'",'‘':"'",'–':'-','—':'-'}))
+    return re.sub(r'\s+',' ',text).strip().rstrip('?.!').strip()
+
+
+def comparison(text):
+    return re.sub(r"(?<![\w'])women(?:'s|s)?(?![\w'])",'women',normalized(text))
+
+
+def ad_text(text):
+    """Clean only the supplied A-column value; retain meaning and other fields."""
+    text=unicodedata.normalize('NFKC',str(text)).translate(str.maketrans({'’':"'",'‘':"'"}))
+    # Expand negative contractions before removing apostrophes.
+    text=re.sub(r"\bcan't\b",'cannot',text,flags=re.I)
+    text=re.sub(r"\bwon't\b",'will not',text,flags=re.I)
+    text=re.sub(r"\bshan't\b",'shall not',text,flags=re.I)
+    text=re.sub(r"\b([a-z]+)n't\b",r'\1 not',text,flags=re.I)
+    # English thousands separators disappear; other numeric commas are ambiguous.
+    text=re.sub(r'(?<![\d.,])\d{1,3}(?:,\d{3})+(?:\.\d+)?(?![\d.,])',lambda m:m[0].replace(',',''),text)
+    if re.search(r'\d,\d',text):
+        return None,'数值中的逗号含义待确认，原文保留；未自动修改'
+    return re.sub(r'\s+',' ',text.replace("'",'').replace(',',' ')).strip(),''
+
+
+def process(rows,mode):
+    groups={};pending=[]
+    for index,source in enumerate(rows,1):
+        source=dict(source)
+        text=source.get('Keyword')
+        if not isinstance(text,str):raise ValueError(f'第{index}行缺少字符串Keyword字段')
+        if not text.strip():continue
+        kind=source.get('kind') or source.get('Type') or 'unknown'
+        kind={'关键词':'keyword','买家问句':'question','ai_generated_question':'question'}.get(kind,kind)
+        output=dict(source)
+        if mode=='ad-a':
+            cleaned,reason=ad_text(text)
+            if cleaned is None:
+                pending.append({'row':index,'original':source,'reason':reason});continue
+            output['Keyword']=cleaned
+        identity=comparison(output['Keyword'])
+        # Word-order identity is safe only for keyword material, never questions.
+        if kind=='keyword':identity=tuple(sorted(re.findall(r"[\w'-]+",identity)))
+        key=(source.get('sheet',''),source.get('Marketplace',''),kind,identity)
+        if key not in groups:
+            groups[key]={'row':output,'originals':[],'source_rows':[],'original_order':index,'kind':kind}
+        groups[key]['originals'].append(source)
+        groups[key]['source_rows'].append(index)
+    records=list(groups.values())
+    # Sort for reading only. This is not semantic grouping or a deletion rule.
+    records.sort(key=lambda g:(g['row'].get('sheet',''),g['kind'],
+        tuple(sorted(re.findall(r"[\w'-]+",comparison(g['row']['Keyword'])))),g['original_order']))
+    return {'mode':mode,'input_rows':len(rows),'kept_rows':len(records),
+        'removed_duplicates':sum(len(g['source_rows'])-1 for g in records),
+        'records':records,'pending':pending,'semantic_grouping':False}
+
+
+def main():
+    parser=argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--input',required=True,help='CSV or JSON array with Keyword, optional Type/kind and sheet')
+    parser.add_argument('--output',required=True,help='New JSON result; source files are never overwritten')
+    parser.add_argument('--mode',choices=['dedup','ad-a'],required=True)
+    args=parser.parse_args();source=Path(args.input);target=Path(args.output)
+    if source.resolve()==target.resolve() or target.exists():raise ValueError('输出必须是尚不存在的新文件')
+    if source.suffix.lower()=='.csv':
+        with source.open(encoding='utf-8-sig',newline='') as stream:rows=list(csv.DictReader(stream))
+    else:rows=json.loads(source.read_text(encoding='utf-8-sig'))
+    if not isinstance(rows,list):raise ValueError('JSON输入必须是行对象数组')
+    result=process(rows,args.mode)
+    target.parent.mkdir(parents=True,exist_ok=True)
+    target.write_text(json.dumps(result,ensure_ascii=False,indent=2),encoding='utf-8')
+    print(json.dumps({k:result[k] for k in ['mode','input_rows','kept_rows','removed_duplicates']},ensure_ascii=False))
+
+
+if __name__=='__main__':main()

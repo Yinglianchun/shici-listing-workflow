@@ -15,7 +15,7 @@ with ZipFile(target,'w',ZIP_DEFLATED) as z:
     for name in modules:
         z.write(ROOT/name,'拾词预处理/'+name)
     for p in (ROOT/'skills/listing-material-workflow').rglob('*'):
-        if p.is_file() and p.suffix in ('.md','.xlsx','.yaml'):
+        if p.is_file() and (p.suffix in ('.md','.xlsx','.yaml') or (p.suffix=='.txt' and 'scripts' in p.relative_to(ROOT/'skills/listing-material-workflow').parts)):
             z.write(p,'拾词预处理/skills/listing-material-workflow/'+p.relative_to(ROOT/'skills/listing-material-workflow').as_posix())
     for name in ['python.exe','pythonw.exe','python313.dll','python3.dll','vcruntime140.dll','vcruntime140_1.dll','LICENSE.txt']:
         z.write(PYTHON/name,'拾词预处理/runtime/'+name)
