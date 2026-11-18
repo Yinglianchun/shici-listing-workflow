@@ -67,7 +67,7 @@ def load(paths):
     return records
 
 
-def deduplicate(records):
+def deduplicate(records, extract_phrases=True):
     groups = {}
     for record in records:
         raw = record['raw']
@@ -86,7 +86,7 @@ def deduplicate(records):
             group['variants'].append(raw['Keyword'])
     for group in groups.values():
         group['duplicate_kind'] = 'normalized' if len(group['variants']) > 1 else 'exact' if len(group['sources']) > 1 else 'unique'
-        if group['kind'] == 'ai_generated_question':
+        if extract_phrases and group['kind'] == 'ai_generated_question':
             group['phrase_candidate'] = phrase(group['text'])
     return list(groups.values())
 

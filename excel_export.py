@@ -142,8 +142,48 @@ def portable_excel(sheets,path):
         z.writestr('xl/styles.xml',f'<styleSheet xmlns="{ns}"><fonts count="2"><font><sz val="{font_size}"/><name val="{body_font}"/></font><font><b/><sz val="{font_size}"/><color rgb="FFFFFFFF"/><name val="Microsoft YaHei"/></font></fonts><fills count="4"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="{header_fill}"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF2F2F2"/></patternFill></fill></fills><borders count="1"><border/></borders><cellStyleXfs count="1"><xf/></cellStyleXfs><cellXfs count="3"><xf fontId="0" fillId="0" borderId="0" xfId="0"><alignment vertical="center" wrapText="1"/></xf><xf fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"><alignment horizontal="center" vertical="center"/></xf><xf fontId="0" fillId="3" borderId="0" xfId="0"><alignment vertical="center" wrapText="1"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>')
 
 
+def delivery_sheets(sheets,filename):
+    """Apply the four-workbook reader layout without changing calculation plans."""
+    kind=next((k for k in ('本品资料与页面改动建议','QA与A+问答','投放分级关键词与问句','描述素材') if k in str(filename)),None)
+    if kind is None:return sheets
+    descriptions={
+        '本品资料与页面改动建议':[
+            ['用途','确认本品、主推子体、核心词和页面改动；后续判断以已确认资料为依据。'],
+            ['怎么填写','先看确认表单所属大块：agent填已有内容，用户只补充或纠正缺项；填完后发“1”执行当前块。'],
+            ['放在哪里用','五点修改建议、需同步的页面字段供更新标题、五点、参数或图片时使用；建议不是已发布内容。']],
+        'QA与A+问答':[
+            ['用途','按具体关注点准备主QA、备选和A+问答，卖家角度回答并解释具体理由。'],
+            ['主QA放哪里','英文回答最多250字符，供本次约定的QA模块；具体后台入口由用户确认后填写。'],
+            ['A+放哪里','英文回答最多500字符，供A+可编辑问答/FAQ区域；副标题与对应答案一起使用。'],
+            ['其他页怎么用','备选供替换和补充；中文译文供核对；原问关联、完整原问池供选题，不直接整池粘贴。']],
+        '投放分级关键词与问句':[
+            ['用途','整理用于投放的分级关键词及由问句提炼的关键表达。'],
+            ['用哪一列','Keyword为实际广告表达，原问句只供核对；每条广告词完整独立使用。'],
+            ['等级怎么用','核心0级，核心外每个独立语义限定加1；0/1级按本项目作为精准否定候选，其余依已确认投放策略使用。'],
+            ['排除页怎么用','本次投放排除、事实不符和其他子体备用分开处理；不把本次不投自动当否定词。']],
+        '描述素材':[
+            ['用途','将已筛选的关键表达整理为商品描述素材组。'],
+            ['放在哪里','供后台商品描述字段使用，按目标父体/子体分别选择；不替代QA或A+回答。'],
+            ['怎么选择','每组最多9000字符，按表中适用范围及目标ASIN分配；超限分多组，不重复凑字。'],
+            ['明细怎么用','采用明细供核对等级和表达，描述稿按分号连接，不保留内容换行。']]}
+    descriptions[kind].append(['开始本块','四块依次为本品资料、投放词句、QA与A+、描述素材。每块先核对材料表单，补齐后发“1”；块内连续执行，完成后停在下一块表单。'])
+    guide={'name':'使用说明','headers':['项目','说明'],'rows':descriptions[kind],
+           'header_row':1,'column_widths':[22,96],'layout':'master_reference'}
+    removed={'Level(源表)','出现ASIN数','涉及ASIN','涉及ASIN/来源'}
+    result=[guide]
+    for s in sheets:
+        if s['name']=='使用说明':continue
+        keep=[i for i,h in enumerate(s['headers']) if h not in removed]
+        updated={**s,'header_row':1,'headers':[s['headers'][i] for i in keep],
+                 'rows':[[r[i] if i<len(r) else '' for i in keep] for r in s.get('rows',[])]}
+        if s.get('column_widths'):updated['column_widths']=[s['column_widths'][i] for i in keep]
+        result.append(updated)
+    return result
+
+
 def export_excel(sheets,path):
     path=Path(path);path=named_file(path.parent,path.name);path.parent.mkdir(parents=True,exist_ok=True)
+    sheets=delivery_sheets(sheets,path.name)
     runtime=Path.home()/'.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node.exe'
     plan=plan_file(path);plan.write_text(json.dumps(sheets,ensure_ascii=False),encoding='utf-8')
     if runtime.exists() and (Path(__file__).parent/'tools/xlsx/node_modules').exists():

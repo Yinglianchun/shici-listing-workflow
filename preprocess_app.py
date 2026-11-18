@@ -1,6 +1,7 @@
 """Standalone, program-only import/deduplication and optional embedding sorting."""
 import json
 import os
+import runpy
 import shutil
 import subprocess
 import sys
@@ -25,8 +26,16 @@ def run_preprocess(folder,embedder=embed_texts):
     def progress(message):save(folder/'status.json',{'state':'running','message':message})
     try:
         progress('导入与基础去重')
-        sources=load([Path(p) for p in cfg['inputs']]);groups=deduplicate(sources)
-        save(folder/'stage1.json',{'sources':sources,'groups':groups})
+        sources=load([Path(p) for p in cfg['inputs']]);groups=deduplicate(sources,extract_phrases=False)
+        helper=runpy.run_path(str(ROOT/'skills/listing-material-workflow/scripts/clean_materials.py.txt'))
+        cores=helper['extract_cores']([{**r['raw'],'source_file':r['file']} for r in sources])
+        candidates=helper['containment_candidates']([{'id':g['group_id'],'text':g['text'],
+            'scope':(g['marketplace'],g['kind'])} for g in groups])
+        # A new stage1 invalidates sorting from any previous run of this job.
+        for stale in [folder/'stage2.json',tables/(stem+'_02_相似排序.xlsx')]:
+            stale.unlink(missing_ok=True)
+        save(folder/'stage1.json',{'sources':sources,'groups':groups,
+            'core_candidates':cores,'containment_candidates':candidates})
         headers=['Keyword','原文ID','类型','来源ID','ASIN']
         plans=[{'name':name,'headers':headers,'rows':[[g['text'],g['group_id'],g['kind'],g['sources'],g['asins']] for g in groups if g['kind']==kind]}
                for name,kind in [('关键词','keyword'),('完整问句','ai_generated_question'),('其他类型','unknown')]]
@@ -59,11 +68,15 @@ def write_preprocess_handoff(folder,cfg):
         if not target.exists():shutil.copyfile(source,target)
     prompt=f'''请由当前agent使用listing-material-workflow Skill直接继续项目：{folder}
 先读使用的Skill/listing-material-workflow/SKILL.md、references/stages.md和references/applicability-and-advertising.md，再读过程表格及stage1.json完整来源。'''
-    prompt+= '\n已完成01基础去重和02文字＋embedding相似排序；stage2.json为完整排序输入，相似组不是重复结论。' if (folder/'stage2.json').exists() else '\n仅完成01基础去重，未计算embedding。先由当前agent按文本与语义组织比较候选，不虚构embedding分数。'
+    sorted_ready=cfg.get('sort') and (folder/'stage2.json').exists()
+    prompt+= '\n已完成01基础去重和02文字＋embedding相似排序；stage2.json为完整排序输入，相似组不是重复结论。' if sorted_ready else '\n仅完成01基础去重，未计算embedding。完成第一块本品资料后，第二块先补02比较候选，再做03适用性；不能跳过02，不虚构embedding分数。'
     prompt+='''
-本次继续前先补00本品分析：向用户取得本品标题、全部五点、参数、已有QA/A+、主图说明与已确认实物补充，并问清主推子体、框色/片色、部件尺寸、品牌排除和投放策略。本轮若缺00分析，就只完成00并停下；若00已完成，本轮只做03本品适用性筛选。每轮只完成一个步骤，落表、给下一步提示后等用户继续，不连做。后续仅在确认适用且用途范围一致的池里做04语义去重，再汇总各CSV、用户此前/当前清单和参考表的核心词，补泛词并固定口径，再分级和提炼关键表达完成广告词库，然后做独立QA，最后复核与组合描述。补充词标本品资料归纳及依据，不编来源次数。
+按四个大块继续：第一块本品资料与页面改动建议（00），第二块投放分级关键词与问句（01—06），第三块QA与A+（07），第四块描述素材（08—09）。先读已有四表及临时状态，按内容接续已完成部分。
+每块开始前先读取已有材料，预填本块补充表单，只让用户补缺项；用户填完后发“1”才执行本块。材料齐全时也简短确认，等“1”；单独发“1”不代表缺失事实已经确认。块内按依赖顺序执行，不再每个内部步骤停一次；中途出现新缺项，集中补问，收到补充和“1”后接着本块。完成本块后保存对应Excel，展示下一块材料表单并等待，不自动跨块。
+第一块先补00本品分析：只有ASIN或链接时先尝试读取本品页面、全部五点及可查看的图片，再问缺项，不让用户重复粘贴已给资料。汇总各CSV核心候选，确认历史核心清单、当前子体及本品依据。已有QA/A+、图片与实物补充按已提供范围读取；广告取舍、QA入口和描述分配在对应块开始前补问。
+第二块先补尚未完成的01/02，再先去已确认他牌并核对03本品适用性，之后在范围一致的可用池做04高重合去重；05补词须补做适用性及重复核对，再固定核心；06先提炼关键表达，重新核对事实与用途，再分级、清标点及去重。补充词标本品资料归纳及依据，不编来源次数。QA读取完整相关原问，描述读取全部文案可用素材，包括本次不投及0/1级素材。
 不启动全流程程序、不运行语义工作流脚本、不调用其他LLM API代跑；可以用文件工具读写、统计、排序及导出Excel；Skill内clean_materials.py.txt仅辅助机械清洗，可由当前AI的代码环境运行，不要求用户电脑安装Python。
-在表格里的四份Excel模板逐阶段填结果，原文CSV、JSON、排序与相似候选继续保留。最终交本品资料与页面改动建议、QA与A+问答、投放分级关键词与问句、描述素材四份Excel；更新人工续做/续做记录.md并给下一阶段提示词。QA用卖家口吻。
+在表格里的同一组四份Excel填结果；本预处理项目已有CSV、JSON和过程表作为接手输入保留，不追溯删除。agent新产生的计算JSON只放本项目.tmp-listing/，状态只记当前块、内部步骤、材料位置、未答项及当前是否已收到“1”，不写续做日志或逐阶段Excel。最终只交四份Excel；必须保留的完整原问、关联和排除原因先落入对应表，确认四表完整可读后清理agent自行生成的临时JSON。QA用卖家口吻。
 新Skill的06把所有问句素材提炼成关键表达填投放表Keyword，C列保留完整原问；不按80字符分档，不一律删除for/with等关系词，QA正式问题不清洗。01/02过程表仍是原文，不先改写来源。
 '''
     (folder/(stem+'_接下来怎么做.txt')).write_text(prompt,encoding='utf-8')

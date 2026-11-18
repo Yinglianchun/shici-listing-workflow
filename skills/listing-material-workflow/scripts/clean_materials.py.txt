@@ -4,6 +4,7 @@ import csv
 import json
 import re
 import unicodedata
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 
@@ -42,6 +43,32 @@ def strip_brands(text,brands):
     return re.sub(r'\s+',' ',cleaned).strip(),removed
 
 
+def containment_candidates(entries):
+    """Mark contiguous whole-word containment in the same scope; never delete."""
+    token_rows=[];index={};candidates=[]
+    for position,entry in enumerate(entries):
+        tokens=tuple(comparison(entry['text']).split())
+        token_rows.append(tokens)
+        for token in set(tokens):
+            index.setdefault((tuple(entry['scope']),token),set()).add(position)
+    for short_pos,short in enumerate(entries):
+        tokens=token_rows[short_pos]
+        if not tokens:continue
+        buckets=[index[(tuple(short['scope']),token)] for token in set(tokens)]
+        matches=set.intersection(*buckets)
+        for long_pos in sorted(matches):
+            long_tokens=token_rows[long_pos]
+            if len(long_tokens)<=len(tokens):continue
+            if not any(long_tokens[start:start+len(tokens)]==tokens
+                       for start in range(len(long_tokens)-len(tokens)+1)):continue
+            long=entries[long_pos]
+            candidates.append({'short_id':short['id'],'long_id':long['id'],
+                'short_text':short['text'],'long_text':long['text'],
+                'relation':'ordered_containment','status':'pending_applicability',
+                'reason':'同顺序完整包含，仅标记；03确认适用后由04判断，不自动删除'})
+    return candidates
+
+
 def process(rows,mode,brands=None):
     groups={};pending=[]
     for index,source in enumerate(rows,1):
@@ -63,8 +90,7 @@ def process(rows,mode,brands=None):
                 pending.append({'row':index,'original':source,'reason':reason});continue
             output['Keyword']=cleaned
         identity=comparison(output['Keyword'])
-        # Word-order identity is safe only for keyword material, never questions.
-        if kind=='keyword':identity=tuple(sorted(re.findall(r"[\w'-]+",identity)))
+        # Keep word order: red frame / blue lenses is not blue frame / red lenses.
         key=(source.get('sheet',''),source.get('Marketplace',''),kind,identity)
         if key not in groups:
             groups[key]={'row':output,'originals':[],'source_rows':[],'original_order':index,'kind':kind}
@@ -74,16 +100,85 @@ def process(rows,mode,brands=None):
     # Sort for reading only. This is not semantic grouping or a deletion rule.
     records.sort(key=lambda g:(g['row'].get('sheet',''),g['kind'],
         tuple(sorted(re.findall(r"[\w'-]+",comparison(g['row']['Keyword'])))),g['original_order']))
+    candidates=containment_candidates([{'id':g['original_order'],'text':g['row']['Keyword'],
+        'scope':(g['row'].get('sheet',''),g['row'].get('Marketplace',''),g['kind'])}
+        for g in records])
     return {'mode':mode,'input_rows':len(rows),'kept_rows':len(records),
         'removed_duplicates':sum(len(g['source_rows'])-1 for g in records),
-        'records':records,'pending':pending,'semantic_grouping':False}
+        'records':records,'pending':pending,'containment_candidates':candidates,
+        'semantic_grouping':False}
+
+
+def extract_cores(rows):
+    """Read only explicit core fields; candidates still require owner confirmation."""
+    candidates={};found=False
+    for row in rows:
+        for field,value in row.items():
+            if re.sub(r'[\s_-]+','',str(field)).casefold() not in ('coreterm','category','核心词','核心泛词'):continue
+            found=True
+            if isinstance(value,str):
+                value=value.strip()
+                if value.startswith('['):
+                    try:value=json.loads(value)
+                    except ValueError:pass
+            for term in value if isinstance(value,list) else [value]:
+                if not isinstance(term,str) or not term.strip():continue
+                identity=comparison(term)
+                item=candidates.setdefault(identity,{'term':term.strip(),'fields':[],'sources':[]})
+                if field not in item['fields']:item['fields'].append(field)
+                source=row.get('source_file',row.get('file',''))
+                if source and source not in item['sources']:item['sources'].append(source)
+    return {'mode':'core-terms','input_rows':len(rows),'core_fields_found':found,
+            'core_candidates':list(candidates.values()),'confirmed':False}
+
+
+def sales_terms(rows,term_column='用户搜索词',orders_column='订单数'):
+    """Clean one product's single report period; keep only terms and order counts."""
+    groups={};pending=[];counts={'summary_rows':0,'asin_rows':0,'zero_order_rows':0,'empty_terms':0}
+    totals={'总订单数','总订单','总计','合计','汇总','grand total','total','total orders'}
+    for index,source in enumerate(rows,1):
+        if term_column not in source or orders_column not in source:
+            raise ValueError(f'第{index}行缺少{term_column}或{orders_column}列')
+        term=str(source[term_column] or '').strip()
+        if not term:counts['empty_terms']+=1;continue
+        if re.sub(r'[:：]+$','',normalized(term)).strip() in totals:
+            counts['summary_rows']+=1;continue
+        # A whole ASIN cell, not an embedded code or a ten-letter word such as binoculars.
+        if re.fullmatch(r'B[A-Z0-9]{9}',term,re.I) and re.search(r'\d',term):
+            counts['asin_rows']+=1;continue
+        original={term_column:source[term_column],orders_column:source[orders_column]}
+        value=source[orders_column]
+        try:
+            if value is None or isinstance(value,bool):raise ValueError()
+            number=unicodedata.normalize('NFKC',str(value)).strip()
+            if re.fullmatch(r'\d{1,3}(?:,\d{3})+(?:\.0+)?',number):number=number.replace(',','')
+            orders=Decimal(number)
+            if not orders.is_finite() or orders<0 or orders!=orders.to_integral_value():raise ValueError()
+            orders=int(orders)
+        except (InvalidOperation,ValueError):
+            pending.append({'row':index,'original':original,'reason':'订单数不是明确的非负整数，未当成0或参与汇总'});continue
+        if orders==0:counts['zero_order_rows']+=1;continue
+        identity=comparison(term)
+        if identity not in groups:
+            groups[identity]={'row':{'Keyword':normalized(term),'Type':'keyword','订单数':0},
+                'originals':[],'source_rows':[],'kind':'keyword'}
+        record=groups[identity];record['row']['订单数']+=orders
+        record['originals'].append(original);record['source_rows'].append(index)
+    records=sorted(groups.values(),key=lambda g:(-g['row']['订单数'],g['row']['Keyword']))
+    terms=[{'用户搜索词':g['row']['Keyword'],'订单数':g['row']['订单数']} for g in records]
+    return {'mode':'sales-terms','input_rows':len(rows),'kept_rows':len(records),
+        'removed_duplicates':sum(len(g['source_rows'])-1 for g in records),
+        'removed_rows':counts,'terms':terms,'records':records,'pending':pending,
+        'total_orders':sum(g['row']['订单数'] for g in records),'semantic_grouping':False}
 
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--input',required=True,help='CSV or JSON array with Keyword, optional Type/kind and sheet')
     parser.add_argument('--output',required=True,help='New JSON result; source files are never overwritten')
-    parser.add_argument('--mode',choices=['dedup','ad-a','strip-brands'],required=True)
+    parser.add_argument('--mode',choices=['core-terms','sales-terms','dedup','ad-a','strip-brands'],required=True)
+    parser.add_argument('--term-column',default='用户搜索词',help='Search-term column for sales-terms mode')
+    parser.add_argument('--orders-column',default='订单数',help='Order-count column for sales-terms mode')
     parser.add_argument('--brands',help='JSON array of confirmed third-party brand names; never include own brand')
     args=parser.parse_args();source=Path(args.input);target=Path(args.output)
     if source.resolve()==target.resolve() or target.exists():raise ValueError('输出必须是尚不存在的新文件')
@@ -94,10 +189,12 @@ def main():
     brands=json.loads(Path(args.brands).read_text(encoding='utf-8-sig')) if args.brands else []
     if not isinstance(brands,list) or any(not isinstance(v,str) for v in brands):raise ValueError('品牌文件必须是品牌名称字符串数组')
     if args.mode=='strip-brands' and not args.brands:raise ValueError('去品牌模式需要--brands品牌清单')
-    result=process(rows,args.mode,brands)
+    if args.mode=='core-terms':result=extract_cores(rows)
+    elif args.mode=='sales-terms':result=sales_terms(rows,args.term_column,args.orders_column)
+    else:result=process(rows,args.mode,brands)
     target.parent.mkdir(parents=True,exist_ok=True)
     target.write_text(json.dumps(result,ensure_ascii=False,indent=2),encoding='utf-8')
-    print(json.dumps({k:result[k] for k in ['mode','input_rows','kept_rows','removed_duplicates']},ensure_ascii=False))
+    print(json.dumps({k:result[k] for k in ['mode','input_rows','kept_rows','removed_duplicates','core_fields_found'] if k in result},ensure_ascii=False))
 
 
 if __name__=='__main__':main()
