@@ -38,7 +38,7 @@ class OutputTests(unittest.TestCase):
         gs=[{'group_id':i,'kind':'keyword','text':text,'sources':[],'assessment':{'core_term':'sunglasses','level':level,'attributes':[]}} for i,text,level in [('a','women sunglasses',1),('b','sunglasses women',1),('c','bad sunglasses',2)]]
         app={'a':{'status':'eligible'},'b':{'status':'eligible'},'c':{'status':'exclude'}}
         plans=keyword_sheets(gs,gs,[],app,{g['group_id']:g['group_id'] for g in gs},{})
-        self.assertEqual(len(plans[1]['rows']),1)
+        self.assertCountEqual([r[1] for r in plans[1]['rows']],['women sunglasses','sunglasses women'])
         self.assertNotIn('bad sunglasses',str(plans))
         self.assertEqual(len(plans),5)
 

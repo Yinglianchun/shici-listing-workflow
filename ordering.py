@@ -2,7 +2,7 @@
 import re
 from collections import defaultdict
 from semantic import semantic_candidates,difference_hints
-from cleaner import normalize
+from cleaner import normalize, comparison_text
 
 FUNCTION_WORDS=set('a an the do does did are is am was were these those this that it they them i you your my our us we their his her its for with of to in on at and have has had can could would will shall should be been being'.split())
 
@@ -68,7 +68,9 @@ def deduplicate_similar(groups,judgments,app):
         if by_id[a]['kind']!=by_id[b]['kind'] or by_id[a]['marketplace']!=by_id[b]['marketplace']:continue
         if app[a].get('status')!=app[b].get('status'):continue
         aw,bw=meaningful_words(by_id[a]['text']),meaningful_words(by_id[b]['text'])
-        if j.get('relation')=='equivalent' and not j.get('left_unique') and not j.get('right_unique') and aw==bw:
+        same_expression = (comparison_text(by_id[a]['text']) == comparison_text(by_id[b]['text'])
+                           if by_id[a]['kind']=='keyword' else aw==bw)
+        if j.get('relation')=='equivalent' and not j.get('left_unique') and not j.get('right_unique') and same_expression:
             relations[a,b]=relations[b,a]='重复表达'
         elif by_id[a]['kind']=='ai_generated_question' and j.get('relation')=='partial_overlap':
             if j.get('left_covers_right') is True and not j.get('right_covers_left') and not j.get('right_unique') and bw<aw:

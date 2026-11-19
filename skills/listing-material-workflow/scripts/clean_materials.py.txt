@@ -132,11 +132,13 @@ def extract_cores(rows):
             'core_candidates':list(candidates.values()),'confirmed':False}
 
 
-def sales_terms(rows,term_column='用户搜索词',orders_column='订单数'):
+def sales_terms(rows,term_column='用户搜索词',orders_column='订单数',skip_first_data_row=True):
     """Clean one product's single report period; keep only terms and order counts."""
     groups={};pending=[];counts={'summary_rows':0,'asin_rows':0,'zero_order_rows':0,'empty_terms':0}
     totals={'总订单数','总订单','总计','合计','汇总','grand total','total','total orders'}
     for index,source in enumerate(rows,1):
+        if index==1 and skip_first_data_row:
+            counts['summary_rows']+=1;continue
         if term_column not in source or orders_column not in source:
             raise ValueError(f'第{index}行缺少{term_column}或{orders_column}列')
         term=str(source[term_column] or '').strip()
@@ -179,6 +181,7 @@ def main():
     parser.add_argument('--mode',choices=['core-terms','sales-terms','dedup','ad-a','strip-brands'],required=True)
     parser.add_argument('--term-column',default='用户搜索词',help='Search-term column for sales-terms mode')
     parser.add_argument('--orders-column',default='订单数',help='Order-count column for sales-terms mode')
+    parser.add_argument('--keep-first-row',action='store_true',help='For an already trimmed report without the first summary data row')
     parser.add_argument('--brands',help='JSON array of confirmed third-party brand names; never include own brand')
     args=parser.parse_args();source=Path(args.input);target=Path(args.output)
     if source.resolve()==target.resolve() or target.exists():raise ValueError('输出必须是尚不存在的新文件')
@@ -190,7 +193,7 @@ def main():
     if not isinstance(brands,list) or any(not isinstance(v,str) for v in brands):raise ValueError('品牌文件必须是品牌名称字符串数组')
     if args.mode=='strip-brands' and not args.brands:raise ValueError('去品牌模式需要--brands品牌清单')
     if args.mode=='core-terms':result=extract_cores(rows)
-    elif args.mode=='sales-terms':result=sales_terms(rows,args.term_column,args.orders_column)
+    elif args.mode=='sales-terms':result=sales_terms(rows,args.term_column,args.orders_column,not args.keep_first_row)
     else:result=process(rows,args.mode,brands)
     target.parent.mkdir(parents=True,exist_ok=True)
     target.write_text(json.dumps(result,ensure_ascii=False,indent=2),encoding='utf-8')

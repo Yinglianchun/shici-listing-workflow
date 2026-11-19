@@ -12,6 +12,7 @@ from judge import judge_pairs
 from applicability import assess
 from materials import build,export
 from finalize import final_comparison,compose_reviewed
+from ad_policy import strip_group_brands
 from excel_export import export_excel
 from handoff import write_handoff
 
@@ -50,6 +51,7 @@ def run(folder,until=9,compose_only=False):
                     sheet('基础去重',['文本组','类型','原文','来源ID','ASIN'],[[g['group_id'],g['kind'],g['text'],', '.join(g['sources']),', '.join(g['asins'])] for g in groups])])
             stage1=read(folder/'stage1.json');sources=stage1['sources'];groups=stage1['groups']
             if until==1:return
+            groups=strip_group_brands(groups,product.get('excluded_brands',[]))
             if not ready(2):
                 begin(2);assessments,stats=analyse(prepare_items(groups,sources),cache/'assessment-cache.sqlite3',model=model,progress=lambda s:print(s,flush=True))
                 graded=[]

@@ -33,10 +33,12 @@ class GroupDedupTests(unittest.TestCase):
         self.assertEqual([sum(map(len,b)) for b in batches],[280,35,310])
         self.assertEqual(sum(len(m) for b in batches for m in b),625)
 
-    def test_keyword_order_is_program_dedup_without_api(self):
-        groups=[group('a','women sunglasses'),group('b','sunglasses women')]
-        result=deduplicate_groups(groups,'test',key_reader=lambda:self.fail('No API needed'))
-        self.assertEqual(result['kept_ids'],['a'])
+    def test_keyword_order_does_not_trigger_automatic_deletion(self):
+        groups=[group('a','red frame blue lenses sunglasses'),
+                group('b','blue frame red lenses sunglasses')]
+        result=deduplicate_groups(groups,'test',transport=lambda *_: ({'repeat':[]},{}),
+                                  key_reader=lambda:'test')
+        self.assertEqual(result['kept_ids'],['a','b'])
 
     def test_covered_question_deleted_but_other_conditions_survive(self):
         groups=[{**group('a','Are sunglasses suitable for fishing?','ai_generated_question'),'sort_group':'s'},

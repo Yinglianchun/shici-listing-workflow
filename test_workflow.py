@@ -78,7 +78,7 @@ class WorkflowTests(unittest.TestCase):
                 return deduplicate_similar(groups,judgments,{g['group_id']:{'status':'unfiltered'} for g in groups})
             def analyse(items,*args,**kwargs):
                 calls.append('grading')
-                self.assertNotIn('d',[i['id'] for i in items]);self.assertNotIn('b',[i['id'] for i in items])
+                self.assertNotIn('d',[i['id'] for i in items]);self.assertIn('b',[i['id'] for i in items])
                 return {i['id']:{'core_term':'sunglasses','attributes':[],'topic':'清洁保养' if single else '包装保养与售后'} for i in items},{}
             def qa_process(args,**kwargs):
                 calls.append('qa');qin=Path(args[args.index('--input')+1]);out=Path(args[args.index('--out')+1]);out.mkdir()
@@ -108,7 +108,7 @@ class WorkflowTests(unittest.TestCase):
                     self.assertIsNone(graded['g']['level'])
                     self.assertEqual(graded['h']['level'],0)
                     self.assertEqual(worker.read(job/'stage4.json')['g']['status'],'pending')
-                self.assertEqual(worker.read(job/('stage3.json' if flow=='dedup-first' else 'stage4.json'))['representatives']['b'],'a')
+                self.assertEqual(worker.read(job/('stage3.json' if flow=='dedup-first' else 'stage4.json'))['representatives']['b'],'b')
                 self.assertIn('c',worker.read(job/('stage3.json' if flow=='dedup-first' else 'stage4.json'))['kept_ids'])
                 tables=list(job.rglob('*.xlsx'));tables=[p for p in tables if '使用的Skill' not in p.parts]
                 self.assertEqual(len(tables),4 if suite else 2 if single else 12 if modern else 11)

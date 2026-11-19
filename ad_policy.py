@@ -21,11 +21,25 @@ def strip_brand_names(text,brands):
     return re.sub(r'\s+',' ',cleaned).strip(),removed
 
 
-def apply_brand_exclusions(groups,decisions,product):
-    results={i:dict(r) for i,r in decisions.items()}
-    for g in groups:
-        brand=matched_brand(g['text'],product.get('excluded_brands',[]))
-        if brand:
-            results[g['group_id']]={**results.get(g['group_id'],{}),'ad_status':'exclude','copy_status':'exclude',
-                'ad_reason':'用户确认排除他牌：'+brand,'copy_reason':'本品文案不使用他牌名'}
-    return results
+def strip_group_brands(groups, brands):
+    """Keep source records and expose the cleaned expression to downstream stages."""
+    from cleaner import comparison_text, phrase
+
+    result = []
+    for group in groups:
+        cleaned, removed = strip_brand_names(group['text'], brands)
+        if not removed:
+            result.append(group)
+            continue
+        if not cleaned or not any(char.isalnum() for char in cleaned):
+            # The import still holds this source, but there is no expression to assess.
+            continue
+        updated = {
+            **group, 'original_text': group.get('original_text', group['text']),
+            'text': cleaned, 'normalized': comparison_text(cleaned),
+            'removed_brands': removed,
+        }
+        if 'phrase_candidate' in updated:
+            updated['phrase_candidate'] = phrase(cleaned)
+        result.append(updated)
+    return result

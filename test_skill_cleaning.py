@@ -36,10 +36,16 @@ class SkillCleaningTests(unittest.TestCase):
         result=helper['sales_terms']([{'term':'gold glasses','orders':'1,000'},
             {'term':'gold glasses','orders':'2.0'},{'term':'other','orders':'1,5'},
             {'term':'negative','orders':-1},{'term':'fraction','orders':1.5},
-            {'term':'blank','orders':''}], 'term','orders')
+            {'term':'blank','orders':''}], 'term','orders',skip_first_data_row=False)
         self.assertEqual(result['total_orders'],1002)
         self.assertEqual(len(result['pending']),4)
-        with self.assertRaises(ValueError):helper['sales_terms']([{'Keyword':'glasses'}])
+        with self.assertRaises(ValueError):helper['sales_terms']([{'Keyword':'glasses'}],skip_first_data_row=False)
+
+    def test_order_report_skips_first_data_row_by_position(self):
+        rows=[{'用户搜索词':'任意汇总文字','订单数':100},{'用户搜索词':'gold glasses','订单数':3}]
+        result=helper['sales_terms'](rows)
+        self.assertEqual(result['terms'],[{'用户搜索词':'gold glasses','订单数':3}])
+        self.assertEqual(result['removed_rows']['summary_rows'],1)
 
     def test_brand_stripping_preserves_properties_and_originals(self):
         from ad_policy import strip_brand_names

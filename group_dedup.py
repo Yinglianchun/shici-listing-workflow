@@ -1,7 +1,7 @@
 """Deduplicate complete similarity groups without cutting a group at batch boundaries."""
 import json
 import re
-from collections import Counter, defaultdict
+from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from judge import request_json
 from semantic import read_api_key
@@ -35,16 +35,7 @@ def complete_group_batches(groups, target=300):
     return batches
 
 def deduplicate_groups(groups,model,workers=5,target=300,transport=request_json,key_reader=read_api_key,progress=lambda s:None):
-    # Keyword word-order duplicates are deterministic. Question order may change meaning.
-    word_orders={};automatic=[];remaining=[]
-    for g in groups:
-        tokens=tuple(sorted(Counter(re.findall(r"[\w'-]+",g['text'].casefold())).items()))
-        key=(g['kind'],g['marketplace'],tokens)
-        if g['kind']=='keyword' and key in word_orders:
-            other=word_orders[key]
-            automatic.append({'left':g['group_id'],'right':other['group_id'],'left_text':g['text'],'right_text':other['text'],
-                'relation':'equivalent','left_unique':[],'right_unique':[],'reason':'相同词汇，仅词序不同','decision_source':'program'})
-        else:word_orders[key]=g;remaining.append(g)
+    automatic=[];remaining=list(groups)
     # Literal "original question + and + extra condition" is direct coverage,
     # even when similarity ordering placed the two questions in different groups.
     question_index={(g['marketplace'],normalize(g['text'])):g for g in remaining if g['kind']=='ai_generated_question'}

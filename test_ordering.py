@@ -31,11 +31,11 @@ class OrderingTests(unittest.TestCase):
         groups=[group('a','polarized sunglasses'),group('b','sunglasses polarized'),group('c','anti glare polarized sunglasses'),group('d','not polarized sunglasses'),group('e','How fast do sunglasses change?','ai_generated_question'),group('f','Do sunglasses change?','ai_generated_question')]
         app={g['group_id']:{'status':'eligible'} for g in groups}
         result=deduplicate_similar(groups,[equivalent(groups[0],g) for g in groups[1:4]]+[equivalent(groups[4],groups[5])],app)
-        self.assertEqual(result['representatives']['b'],'a')
+        self.assertEqual(result['representatives']['b'],'b')
         self.assertTrue(all(i in result['kept_ids'] for i in ['a','c','d','e','f']))
 
     def test_no_transitive_collapse_or_pending_to_eligible_collapse(self):
-        groups=[group('a','polarized sunglasses'),group('b','sunglasses polarized'),group('c','polarized sunglasses')]
+        groups=[group('a','polarized sunglasses'),group('b','Polarized sunglasses'),group('c','polarized sunglasses')]
         app={g['group_id']:{'status':'eligible'} for g in groups}
         result=deduplicate_similar(groups,[equivalent(groups[0],groups[1]),equivalent(groups[1],groups[2])],app)
         self.assertEqual(result['kept_ids'],['a','c'])

@@ -24,7 +24,7 @@ from qa_topics import discover_topics
 from word_export import export_description
 from qa_delivery import export_qa
 from product_workbook import export_product
-from ad_policy import apply_brand_exclusions
+from ad_policy import strip_group_brands
 from output_plans import screened_sheets,question_grade_sheets,cleaned_question_sheets,prefix_sheets,description_sheets,approved_ids,qa_sheets
 
 SORTED_STAGES=['导入与基础去重','相似素材排序分组','本品适用性筛选','高重合素材去重','方向分类与属性分级','独立QA选题与回答','短语清洗与本品复核','前缀整理与广告词','描述组合与导出']
@@ -85,6 +85,7 @@ def run(folder,until=9,compose_only=False):
             imported=read(folder/'stage1.json');sources=imported['sources'];groups=imported['groups']
             if until==1:return
             if not ready(2):
+                groups=strip_group_brands(groups,product.get('excluded_brands',[]))
                 begin(2);vectors,_=embed_texts([g['text'] for g in groups],cache/'embedding-cache.sqlite3',model=cfg['embedding_model'],progress=lambda s:print(s,flush=True))
                 ranked=rank_groups(groups,vectors);save(folder/'stage2.json',ranked)
                 done(2,[sheet('排序分组',['排序','相似组','直接比较代表','原文ID','类型','完整原文','来源ID'],[[g['sort_order'],g['sort_group'],g['sort_anchor'],g['group_id'],g['kind'],g['text'],g['sources']] for g in ranked['groups']]),sheet('相似候选',['左ID','右ID','左原文','右原文','语义相似度','文字重合度','左新词','右新词'],[[p['left'],p['right'],p['left_text'],p['right_text'],p['score'] if p['score_type']=='embedding_cosine' else '',p['token_overlap'],p['left_only_tokens'],p['right_only_tokens']] for p in ranked['candidates']])])
@@ -103,7 +104,6 @@ def run(folder,until=9,compose_only=False):
                 if not ready(4):
                     begin(4);to_screen=[g for g in groups if g['group_id'] in dedup['kept_ids']]
                     app=read(cfg['reuse_applicability']) if cfg.get('reuse_applicability') else assess(to_screen,product,cache/'applicability-cache.sqlite3',model=cfg.get('screen_model',model))[0]
-                    app=apply_brand_exclusions(to_screen,app,product)
                     by_id={g['group_id']:g for g in groups}
                     for g in groups:
                         identifier=g['group_id'];representative=roots[identifier]
