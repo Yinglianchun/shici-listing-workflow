@@ -89,8 +89,8 @@ def process(rows,mode,brands=None):
             if cleaned is None:
                 pending.append({'row':index,'original':source,'reason':reason});continue
             output['Keyword']=cleaned
-        identity=comparison(output['Keyword'])
-        # Keep word order: red frame / blue lenses is not blue frame / red lenses.
+        identity=normalized(output['Keyword'])
+        # Only exact formatting-normalized duplicates merge here. Lexical variants remain for stage 06.
         key=(source.get('sheet',''),source.get('Marketplace',''),kind,identity)
         if key not in groups:
             groups[key]={'row':output,'originals':[],'source_rows':[],'original_order':index,'kind':kind}
@@ -160,7 +160,7 @@ def sales_terms(rows,term_column='用户搜索词',orders_column='订单数',ski
         except (InvalidOperation,ValueError):
             pending.append({'row':index,'original':original,'reason':'订单数不是明确的非负整数，未当成0或参与汇总'});continue
         if orders==0:counts['zero_order_rows']+=1;continue
-        identity=comparison(term)
+        identity=normalized(term)
         if identity not in groups:
             groups[identity]={'row':{'Keyword':normalized(term),'Type':'keyword','订单数':0},
                 'originals':[],'source_rows':[],'kind':'keyword'}
