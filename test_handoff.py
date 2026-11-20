@@ -47,7 +47,7 @@ class HandoffTests(unittest.TestCase):
             self.assertIn('03 高重合素材去重',result['prompt'])
             self.assertIn('完整包含',result['prompt'])
             copied=(folder/'使用的Skill/listing-material-workflow/SKILL.md').read_text(encoding='utf-8')
-            self.assertIn('03本品适用性筛选 → 04高重合素材去重',copied)
+            self.assertIn('03本品适用性筛选 → 04高重合比较',copied)
             self.assertIn('旧程序',copied)
 
     def test_each_stage_points_to_its_required_existing_outputs(self):

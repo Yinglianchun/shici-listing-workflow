@@ -21,13 +21,14 @@ class PreprocessTests(unittest.TestCase):
                 self.assertEqual((status['sources'],status['groups']),(3,2))
                 stage=json.loads((folder/'stage1.json').read_text(encoding='utf-8'))
                 self.assertTrue(all('phrase_candidate' not in g for g in stage['groups']))
-                self.assertEqual(len(list((folder/'表格').glob('*.xlsx'))),4)
+                self.assertEqual(len(list((folder/'最终输出').glob('*.xlsx'))),4)
+                self.assertTrue((folder/'步骤备份').is_dir())
                 self.assertIn('未计算embedding',(folder/'OWN_2026-11-16_接下来怎么做.txt').read_text(encoding='utf-8'))
                 prompt=(folder/'OWN_2026-11-16_接下来怎么做.txt').read_text(encoding='utf-8')
                 self.assertIn('先补02',prompt)
                 self.assertIn('发“1”',prompt)
                 self.assertNotIn('续做记录.md',prompt)
-                target=next((folder/'表格').glob('*.xlsx'));target.write_bytes(b'human changes')
+                target=next((folder/'最终输出').glob('*.xlsx'));target.write_bytes(b'human changes')
                 cfg['sort']=True;app.save(folder/'preprocess.json',cfg)
                 calls=[]
                 def embed(texts,*a,**kw):calls.append(texts);return [[1,0],[0,1]],{}

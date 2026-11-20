@@ -19,7 +19,7 @@ cfg={'export_prefix':'OWN_2026-11-16','inputs':[str(csv)],'sort':False}
 app.save(job/'preprocess.json',cfg)
 def no_api(*a,**kw):raise AssertionError('basic mode made an API call')
 app.run_preprocess(job,no_api)
-assert len(list((job/'表格').glob('*.xlsx')))==4
+assert len(list((job/'最终输出').glob('*.xlsx')))==4
 assert json.loads((job/'status.json').read_text(encoding='utf-8'))['groups']==2
 cfg['sort']=True;app.save(job/'preprocess.json',cfg)
 app.run_preprocess(job,lambda texts,*a,**kw:([[1,0],[0,1]],{}))
