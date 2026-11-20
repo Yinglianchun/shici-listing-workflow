@@ -34,8 +34,8 @@ def assemble_groups(candidates,limit=9000):
     if limit<1:raise ValueError('每组字符上限必须大于0')
     unique={};pending=[]
     for candidate in candidates:
-        text=re.sub(r'\s+',' ',candidate['text']).strip()
-        if not text:continue
+        text=candidate['text']
+        if not text.strip():continue
         key=comparison_text(text)
         if key in unique:
             previous=unique[key]

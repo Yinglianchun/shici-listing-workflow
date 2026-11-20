@@ -10,6 +10,19 @@ from excel_export import portable_excel
 
 
 class MasterWorkbookTests(unittest.TestCase):
+    def test_modifiers_keep_english_phrases_in_expression_order(self):
+        from keyword_layout import attribute_details
+        attributes = [
+            {'evidence':['lightweight'], 'labels':['轻量']},
+            {'evidence':['女性'], 'values':['for women']},
+            {'evidence':['90s']},
+            {'evidence':['中文原因']},
+        ]
+        self.assertEqual(
+            attribute_details(attributes, '90s sunglasses for women lightweight'),
+            '90s + for women + lightweight',
+        )
+
     def test_four_workbooks_ask_missing_facts_without_pending_sheets(self):
         from product_workbook import product_sheets
         self.assertNotIn('待补资料',{p['name'] for p in product_sheets({'asin':'OWN'},{'missing_information':[{'item':'镜片材质','reason':'未提供'}]})})

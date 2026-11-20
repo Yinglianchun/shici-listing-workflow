@@ -9,11 +9,25 @@ def templates():
     from master_workbook import blank_master_sheets
     from qa_delivery import delivery_sheets
     from product_workbook import product_sheets
+    ad_plans = blank_master_sheets(False)
+    ad_tabs = {plan['name']: plan for plan in ad_plans}
+    excluded_types = {
+        '专用运动眼镜': ('sports glasses', 'sports sunglasses'),
+        '儿童眼镜': ('kids glasses', 'kids sunglasses', 'kid sunglasses', 'childrens glasses',
+                     'childrens sunglasses', 'sunglasses for kids'),
+    }
+    for intent, phrases in excluded_types.items():
+        reason = f'普通成人太阳镜排除{intent}需求'
+        for phrase in phrases:
+            ad_tabs['已剔除-附原因']['rows'].append([phrase, '预置排除规则', reason, '', '', '', '', '', ''])
+            ad_tabs['词组否定']['rows'].append([phrase, '词组否定', intent, reason, '预置'])
+    ad_tabs['已剔除-附原因']['note'] += ' 预置规则行不计实际剔除；命中时另记完整原词句。'
+    ad_tabs['词组否定']['note'] = '普通成人太阳镜预置；如本品属于预置类型，移除对应项。'
     final={'advertising_keywords':[],'prefix_groups':[],'description':'','description_selection':[],'description_limit':9000}
     return {
       '素材总表空模板.xlsx':blank_master_sheets(),
-      '投放分级关键词与问句空模板.xlsx':blank_master_sheets(False),
-      '本品资料与页面改动建议空模板.xlsx':[p if p['name']=='确认表单' else {**p,'rows':[],'template_rows':4} for p in product_sheets()],
+      '投放分级关键词与问句空模板.xlsx':ad_plans,
+      '本品资料与页面改动建议空模板.xlsx':empty(product_sheets()),
       '描述素材空模板.xlsx':empty(description_sheets({**final,'description_groups':[]})),
       'QA与A+问答空模板.xlsx':empty(delivery_sheets({'qa':[],'original_questions':[]})),
       '00_本品分析.xlsx':empty(analysis_sheets({})),

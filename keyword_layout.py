@@ -1,5 +1,6 @@
 """Fixed keyword workbook layout, matching the user's reference without its overview."""
 from collections import Counter,defaultdict
+import re
 from cleaner import normalize,comparison_text
 from ad_policy import matched_brand
 
@@ -15,13 +16,28 @@ def sheet(name,headers,rows):return {'name':name,'headers':headers,'rows':rows,'
 def keyword_identity(text):
     return comparison_text(text)
 
-def attribute_details(attributes):
+def attribute_details(attributes, text=''):
     details=[]
     for a in attributes:
         if not isinstance(a,dict):continue
-        words=a.get('evidence') or a.get('values') or []
-        if isinstance(words,str):words=[words]
-        details.extend(str(w) for w in words if w)
+        for field in ('evidence', 'values'):
+            words=a.get(field) or []
+            if isinstance(words,str):words=[words]
+            english=[w.strip() for w in words if isinstance(w,str)
+                     and re.search(r'[A-Za-z0-9]',w) and not re.search(r'[\u3400-\u9fff]',w)]
+            if english:
+                if a.get('concept') == 'uv_protection':
+                    specific = next((word for word in english if normalize(word) == 'uv400'), None)
+                    if specific:
+                        english = [specific]
+                details.extend(english)
+                break
+    if text:
+        normalized=normalize(text)
+        def position(phrase):
+            index=normalized.find(normalize(phrase))
+            return index if index >= 0 else len(normalized)
+        details.sort(key=position)
     return ' + '.join(dict.fromkeys(details))
 
 def empty_template():
@@ -51,6 +67,6 @@ def keyword_sheets(graded,groups,sources,app,representatives,product):
         for g in kept:
             a=g['assessment'];n=a.get('level')
             if not isinstance(n,int) or (n!=level if level<4 else n<4):continue
-            rows.append([len(rows)+1,g['text'],normalize(a.get('core_term') or ''),n,attribute_details(a.get('attributes',[])),'建议否定' if n<=1 else '待人工确定'])
+            rows.append([len(rows)+1,g['text'],normalize(a.get('core_term') or ''),n,attribute_details(a.get('attributes',[]),g['text']),'建议否定' if n<=1 else '待人工确定'])
         plans.append(sheet(name,TERM_HEADERS,rows))
     return plans

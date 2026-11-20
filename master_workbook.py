@@ -83,7 +83,7 @@ def build_master(folder,stage=0):
     def metadata(g,a):
         old=list(dict.fromkeys(str(source_map[s]['raw'].get('Level','')) for s in g.get('sources',[]) if s in source_map))
         basis=list(dict.fromkeys(str(source_map[s]['raw'].get('Evidence','')) for s in g.get('sources',[]) if s in source_map))
-        return [a.get('level'),a.get('core_term',''),attribute_details(a.get('attributes',[])),a.get('intent',''),', '.join(filter(None,old)),len(g.get('asins',[])),g.get('asins',[]),'；'.join(filter(None,basis))]
+        return [a.get('level'),a.get('core_term',''),attribute_details(a.get('attributes',[]),g['text']),a.get('intent',''),', '.join(filter(None,old)),len(g.get('asins',[])),g.get('asins',[]),'；'.join(filter(None,basis))]
     # The refreshed stage plans define which graded rows survived final product review.
     keyword_plans=read(folder,'stage5.plan.json',[])
     approved_kw={normalize(r[1]) for p in keyword_plans if p.get('name')!='L0_核心泛词' for r in p.get('rows',[]) if len(r)>1}

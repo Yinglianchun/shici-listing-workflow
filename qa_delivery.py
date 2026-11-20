@@ -5,16 +5,19 @@ from judge import request_json
 from semantic import read_api_key
 from output_plans import qa_sheets, sheet
 from ad_policy import matched_brand
+from qa import SCENARIO_REASON
 
 PROMPT='''为本品QA交付做选题排序并完成一次答案定稿。输入candidate_qa来自实际原问，不是商品事实。每条answer_characters和aplus_characters是程序真实统计的英文字符数，不是模型估计，不含中文。
+英文QA用自然的美式口语。先用一句直接回答所有被问到的点，再顺着问题补一两句已确认的细节和实际作用。答案明确为肯定时可用 Yes, they do! 或 Absolutely!；否定或有条件时直接说明。按问题变化开头，可用自然缩写。主QA和备选QA都优先写到240—250个英文字符（含空格和标点），有相关依据时尽量接近250。少于240时先看还有没有与该问题相关的已确认规格、实际作用或使用条件可以补充；相关依据用尽才允许更短，不能超过250。
 QA、备选QA、A+及中文译文均站在卖家角度直接回答自家商品，可用our/我们的或以产品为主语，不用the listing says、described as、according to the product page、listed weight等第三方转述。出处放basis，不塞进买家答案；不无端追加“不能消除路面反光”等未经本品资料支持或无关的负面结论。问题确实询问边界/比较时按已确认内容如实回答，不隐瞒、不夸大。
 本品问题和回答不含他牌名，品牌原文仍留在来源记录；投放策略排除不等于QA/文案不能谈论本品已确认特性。场景按product.analysis.shared_scenarios核对，关联五点建议及描述口径，不因重复出现而断言索引或真实需求。
 main_ids优先选择10个有价值、方向互补且本品有依据的QA；同一方向只选一条，不为凑10条重复选题。支持不足或不足10个时少选，缺资料问题保留备选。
 眼镜候选若涉及汗液腐蚀、长期佩戴/皮肤接触过敏、涂层或抗刮，优先选1—2个有价值的问题，近义内容可合于同一问题，其余留备选；按本品确认的部件和子体回答，不由防腐推出不过敏或由抗刮推出绝不刮花。不按AI原问数量断言真实需求高低。
 aplus_ids另选2—3个适合A+详细解释的问答，优先互补、值得展开的功能/适配/使用关注点，可与主QA重合；不足时少选。
-其余全部留备选，不删除原稿。对所有候选的QA英文答案完成定稿，充分利用250字符；只对aplus_ids所选的2—3条定稿A+英文答案，充分利用500字符。只依据本品资料，不借竞品或未确认功能。
+其余全部留备选，不删除原稿。根据本品资料重新撰写所有候选的QA英文答案，用于QA区，最多250字符。只对aplus_ids所选的2—3条重新撰写A+英文答案，按500字符预算写。已提供的历史QA/A+和其他材料只补充本品事实及依据。
 非常注意：250/500是包含空格和标点的英文字符，不是单词！QA尽量240—250字符，通常约35—40个英文单词；A+尽量480—500字符，通常约70—80个英文单词。原答案超限时根据给出的实际长度缩短，不直接照抄超长稿。先保留相关条件、参数和必要边界，再精简冗词；依据少可短些，绝不编内容填满。同步更新中文译文，不改问题、不改来源关系。不截断句子。
 返回JSON：main_ids数组、aplus_ids数组、reason、finalized_answers数组。finalized_answers每项qa_id,answer_en,answer_zh；属于aplus_ids时还含aplus_answer_en,aplus_answer_zh。只使用已有qa_id，原稿由程序完整留档。'''
+PROMPT += '\n' + SCENARIO_REASON
 
 
 def curate(result,product,model,path,transport=request_json,key_reader=read_api_key):

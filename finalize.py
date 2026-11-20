@@ -2,7 +2,7 @@
 import re
 from cleaner import normalize
 from applicability import assess
-from materials import assemble,assemble_groups
+from materials import assemble_groups
 from keyword_layout import keyword_identity
 from ad_policy import matched_brand
 
@@ -129,22 +129,16 @@ def compose_reviewed(reviews,limit=9000,multi_group=False):
     compact=[]
     for format in ['关键词','清洗短语']:
         compact.extend(prefix_groups([r for r in description_items if r['format']==format]))
-    candidates=[{'text':g['text'],'priority':min(m['priority'] for m in g['members']),
-        'level':min(m['level'] for m in g['members']),'format':g['members'][0]['format'],
-        'material_ids':[m['material_id'] for m in g['members']]} for g in compact]
+    # The final text uses the reviewed entries, never the compressed preview.
+    candidates=[{**item,'material_ids':[item['material_id']]} for item in description_items]
+    groups,pending=assemble_groups(candidates,limit)
+    text=groups[0]['description'] if groups else ''
     extras={}
     if multi_group:
-        # Unpack an oversized prefix group before packing; preserve its full members.
-        expanded=[]
-        for candidate,group in zip(candidates,compact):
-            if len(candidate['text'])<=limit:expanded.append(candidate)
-            else:
-                expanded.extend({**m,'material_ids':[m['material_id']]} for m in group['members'])
-        groups,pending=assemble_groups(expanded,limit)
-        text=groups[0]['description'] if groups else ''
         selection=[r for g in groups for r in g['selection']]
         extras={'description_groups':groups,'description_unassigned':pending,
             'description_total_characters':sum(g['characters'] for g in groups)}
-    else:text,selection=assemble(candidates,limit)
+    else:
+        selection=groups[0]['selection'] if groups else []
     return {**extras,'advertising_keywords':keywords,'prefix_groups':compact,'description':text,'description_selection':selection,
         'reviewed_count':len(reviews),'passed_count':len(passed),'description_characters':len(text),'description_limit':limit}

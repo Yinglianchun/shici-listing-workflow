@@ -17,6 +17,7 @@ class FinalizeTests(unittest.TestCase):
         self.assertEqual({i for r in result['description_selection'] for i in r['material_ids']},{str(i) for i in range(120)})
         for g in result['description_groups']:
             self.assertLessEqual(len(g['description']),9000)
+            self.assertEqual(g['description'],'; '.join(r['text'] for r in g['selection']))
             self.assertEqual(g['target_asin'],'')
             self.assertEqual(g['assignment_status'],'待分配')
         plans=description_sheets(result)
@@ -110,6 +111,8 @@ class FinalizeTests(unittest.TestCase):
         a='polarized photochromic sunglasses for men driving';b='polarized photochromic sunglasses for men fishing'
         result=compose_reviewed([row('1',a,'eligible'),row('2',b,'eligible'),row('3','blue light protection','pending')])
         self.assertEqual([r['keyword'] for r in result['advertising_keywords']],[a,b])
+        self.assertEqual(result['description'],a+'; '+b)
+        self.assertEqual([r['text'] for r in result['description_selection']],[a,b])
         self.assertNotIn('blue light',result['description'])
         self.assertLess(len(result['description']),9000)
 

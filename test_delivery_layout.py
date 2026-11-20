@@ -27,12 +27,9 @@ class DeliveryLayoutTests(unittest.TestCase):
             self.assertTrue(shown[0]['rows'])
             self.assertTrue(all(len(row)==len(s['headers']) for s in shown for row in s['rows']))
         form=next(p for p in plans[names[0]] if p['name']=='确认表单')
-        self.assertTrue(any(r[0]=='补充核心泛词' for r in form['rows']))
-        self.assertTrue(all(len(r)==4 for r in form['rows']))
-        self.assertEqual(form['headers'][-1],'所属大块')
-        self.assertEqual(next(r for r in form['rows'] if r[0]=='广告范围与品牌')[-1],'第二块')
-        self.assertEqual(next(r for r in form['rows'] if r[0]=='QA使用入口')[-1],'第三块')
-        self.assertEqual(next(r for r in form['rows'] if r[0]=='描述分配')[-1],'第四块')
+        self.assertEqual(form['headers'],['确认项目','已有依据','确认结果','所属大块'])
+        self.assertEqual(form['rows'],[])
+        self.assertGreater(form['template_rows'],0)
 
     def test_core_extraction_does_not_promote_keywords_or_count_words(self):
         helper=runpy.run_path(str(Path(__file__).parent/'skills/listing-material-workflow/scripts/clean_materials.py.txt'))

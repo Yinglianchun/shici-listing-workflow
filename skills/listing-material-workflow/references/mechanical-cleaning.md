@@ -8,7 +8,7 @@
 
 脚本只合并规范化后完全重复：统一大小写、空格、全半角、已约定末尾标点及women/womens/所有格比较写法，原文保留。关键词、问句都不按拆词排序判重；red frame blue lenses与blue frame red lenses必须分开。顺序不同、属性/部件归属不同、否定、数值或条件不同都不机械删除。
 
-同顺序、整词连续完整包含仅写containment_candidates，记录short_id/long_id、双方文本及pending_applicability状态；id对应records的original_order，即输入行序号。双方仍保留在records，不因包含链间接删除，也不把sun当作sunglasses中的完整词。候选只在相同sheet、站点和素材类型中比较。确认03本品适用性后，04再判断是否真的可删；广告关键词增加限定仍分别保留，不用长词替代短词。
+同顺序、整词连续完整包含仅写containment_candidates，记录short_id/long_id、双方文本及pending_applicability状态；id对应records的original_order，即输入行序号。双方仍保留在records，不因包含链间接删除，也不把sun当作sunglasses中的完整词。候选只在相同sheet、站点和素材类型中比较。03确认本品适用性后，由04判断完整覆盖并记候选，06按各条独立分级及最终Sheet决定是否合并。包含去重只在同一最终Sheet内执行；广告关键词增加限定仍分别保留，不用长词替代短词。
 
 脚本还可字面排序、移除已确认品牌及清理广告A列标点；不提炼关键表达，不判断本品适用性、属性级别、同义覆盖或选QA写描述，也不调用其他LLM。字面排序及包含候选都不是语义结论。
 

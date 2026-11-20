@@ -2,6 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from grading import normalize_assessment,compute_level,analyse
+from keyword_layout import attribute_details
 
 
 def row(identifier,core,attributes):
@@ -50,6 +51,23 @@ class GradingTests(unittest.TestCase):
         result=normalize_assessment(row('A','sunglasses',[attribute('face_fit','round faces','round faces')]),item)
         self.assertEqual(compute_level(result,'keyword')['level'],2)
 
+    def test_distinct_frame_shapes_count_separately_but_spellings_do_not(self):
+        cases = [
+            ('oval cat eye sunglasses', 'sunglasses', [], 2),
+            ('oval cat eye sunglasses', 'sunglasses',
+             [attribute('shape', 'oval cat eye', 'oval cat eye')], 2),
+            ('cat-eye cat eye sunglasses', 'sunglasses', [], 1),
+            ('oval cat eye sunglasses', 'cat eye sunglasses', [], 1),
+            ('oval oval sunglasses', 'oval sunglasses', [attribute('shape', 'oval', 'oval')], 0),
+            ('oval sunglasses for oval faces', 'oval sunglasses',
+             [attribute('face_fit', 'oval', 'oval faces')], 1),
+        ]
+        for text, core, attributes, expected in cases:
+            with self.subTest(text=text, core=core):
+                item = {'id':'A', 'text':text, 'kind':'keyword', 'core_candidates':[core]}
+                result = normalize_assessment(row('A',core,attributes),item)
+                self.assertEqual(compute_level(result,'keyword')['level'],expected)
+
     def test_compound_measurement_and_fit_over_count_once_each(self):
         text='sunglasses with 14cm arm length that fit over prescription glasses'
         item={'id':'A','text':text,'core_candidates':['sunglasses']}
@@ -64,6 +82,50 @@ class GradingTests(unittest.TestCase):
             attribute('lightweight','lightweight','lightweight'),attribute('face_fit','small faces','small faces')]),item)
         self.assertEqual(compute_level(result,'keyword')['level'],3)
         self.assertEqual(len(result['attributes'][0]['values']),2)
+
+    def test_uv_limitations_count_per_expression(self):
+        uv400 = attribute('uv400', 'UV400', 'UV400')
+        uv_protection = attribute('uv_protection', 'UV protection', 'UV protection')
+        for phrase, attributes, modifier in [
+            ('UV400 sunglasses', [uv400], 'UV400'),
+            ('UV protection sunglasses', [uv_protection], 'UV protection'),
+            ('UV protection UV400 sunglasses', [uv_protection, uv400], 'UV400'),
+        ]:
+            with self.subTest(phrase=phrase):
+                item = {'id': 'A', 'text': phrase, 'core_candidates': ['sunglasses']}
+                assessment = normalize_assessment(row('A', 'sunglasses', attributes), item)
+                self.assertEqual(compute_level(assessment, 'keyword')['level'], 1)
+                self.assertEqual(attribute_details(assessment['attributes'], phrase), modifier)
+
+    def test_combined_style_words_count_separately(self):
+        for style, modifiers in [
+            ('90s retro', '90s + retro'),
+            ('y2k trendy', 'y2k + trendy'),
+            ('90s retro y2k trendy', '90s + retro + y2k + trendy'),
+        ]:
+            with self.subTest(style=style):
+                text = style + ' sunglasses'
+                item = {'id': 'A', 'text': text, 'core_candidates': ['sunglasses']}
+                result = normalize_assessment(row('A', 'sunglasses', [
+                    attribute('retro_style', style, style),
+                ]), item)
+                self.assertEqual(compute_level(result, 'keyword')['level'], len(style.split()))
+                self.assertEqual(attribute_details(result['attributes'], text), modifiers)
+
+    def test_topic_buckets_do_not_merge_independent_limitations(self):
+        item={'id':'A','text':'90s casual UV400 UV protection polarized sunglasses for women',
+              'kind':'keyword','core_candidates':['sunglasses']}
+        attributes=[
+            attribute('style','90s','90s'),attribute('style','casual','casual'),
+            attribute('features','UV400','UV400'),attribute('features','UV protection','UV protection'),
+            attribute('features','polarized','polarized'),attribute('audience','women','for women'),
+        ]
+        result=normalize_assessment(row('A','sunglasses',attributes),item)
+        self.assertEqual(compute_level(result,'keyword')['level'],5)
+        self.assertEqual([a['values'] for a in result['attributes'] if a['concept']=='style'],
+                         [['90s'],['casual']])
+        self.assertEqual([a['values'] for a in result['attributes'] if a['concept']=='uv_protection'],
+                         [['UV400','UV protection']])
 
     def test_attributes_already_inside_core_not_counted(self):
         item={'id':'A','text':'night driving glasses for men','core_candidates':['night driving glasses']}
