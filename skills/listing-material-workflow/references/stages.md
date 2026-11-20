@@ -36,7 +36,7 @@
 
 偏光场景QA与A+的光学依据：[美国眼科学会推荐的太阳镜类型](https://www.aao.org/eye-health/glasses-contacts/sunglasses-recommended-types)、[田纳西大学物理课程的反射偏振说明](https://labs.phys.utk.edu/mbreinig/phys222core/modules/m6/polarization.html)。
 
-06提炼前问句表A列留空，原问列保留全文，不能拿仅去问号的原问冒充关键表达。QA问题仍是完整问句；旧Level与拓词Evidence不作为本轮事实依据，来源重复次数不等于搜索量。
+06处理前问句A列与描述用表达F列留空，原问E列保留全文。**原问不足80字符时A列仅去问号是明确允许的投放例外，不得误判成未提炼；达到80字符时必须提炼后才能进入A列**。F列无论长短都另外提炼，QA正式问题仍保留完整问句；旧Level与拓词Evidence不作为本轮事实依据，来源重复次数不等于搜索量。
 
 新增资料或口径改变后回查受影响的判断、等级及答案，不只重拼09。07和09完成后回填共用场景的QA、描述与五点建议关联；只建表或列场景不代表三处已同步。
 
