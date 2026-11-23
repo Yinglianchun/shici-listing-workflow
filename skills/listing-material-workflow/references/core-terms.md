@@ -2,22 +2,30 @@
 
 ## 内置核心词候选库
 
-此库只提供**候选项**，并不代表所有商品都适用、更不代表已经确认成0级。开始新任务时，先从用户本轮**全部已上传CSV**的CoreTerm/Category显式字段抽取核心，保留每条出处，再与本库逐项筛选适合当前本品/子体的词，向用户提出“CSV已有A、B，是否再增加C、D？”等具体补充问题；未经确认不得擅自加入正式核心词表。CSV无此字段时说明无显式字段，不把全部Keyword猜成核心。只有ASIN而暂无CSV时可先完成本品资料，收到CSV后再做核心确认。
+此库只提供**候选项**，并不代表所有商品都适用、更不代表已经确认成0级。开始新任务时，先从用户本轮**全部已上传CSV**的CoreTerm/Category显式字段抽取核心，保留每条出处，再与本库逐项筛选适合当前本品/子体的词，集中向用户提出“CSV已有A、B；按本品条件，建议补充C、D，是否加入本轮核心泛词？你还想自行补充哪些核心词？”；同时给出候选来源、适用依据及采用后的等级影响。已在CSV或本轮确认清单中的同一核心概念不重复列作新增建议；没有新增适用项时仍询问是否自行补充，已有明确答复则沿用。未经确认不得擅自加入正式核心词表。CSV无此字段时说明无显式字段，不把全部Keyword猜成核心。只有ASIN而暂无CSV时可先完成本品资料，收到CSV后再做核心确认。
 
 | 内置候选词（原样保存） | 适用性提示 |
 |---|---|
 | `sunglasses` | 普通太阳镜通用类目候选 |
-| `sun glasses` | 原有分词写法候选 |
-| `glasses` | 宽泛眼镜类目，需核对投放目的 |
+| `sun glasses` / `Sun glasses` | 太阳镜分词写法候选，保留来源原文 |
+| `glasses` | 宽泛眼镜类目，核对当前商品类型及投放目的后提议 |
 | `women sunglasses` | 女性太阳镜相关商品候选 |
+| `womens sunglasses` | 女性太阳镜写法候选，按已确认的同一核心概念匹配 |
+| `women glasses` | 女性眼镜宽泛类目候选，核对本品女性定位及投放目的 |
+| `glasses for women` | 女性眼镜宽泛类目的另一种写法候选，核对本品女性定位及投放目的 |
 | `sunglasses for women` | 同一核心概念的另一种写法候选 |
 | `sun glassesfor women` | **按用户要求特意保留的错误拼写原文**，不要自动更正成`sun glasses for women`，只作候选，须用户明确确认是否采用 |
 | `polarized sunglasses` | 仅已确认偏光型号可提议 |
+| `black sunglasses` | 本次商品/子体有已确认黑色外观时提议，注明黑色对应镜框、镜片或整体的采用范围 |
+| `oversized sunglasses` / `oversize sunglasses` | 本品已确认采用大框/oversized定位时提议，保留两种原始写法 |
+| `Aviators` | 本品已确认属于aviator飞行员款式时提议 |
+| `shades` | 在太阳镜语境中作为通用类目称呼候选 |
+| `oversized aviators` | 本品同时符合oversized大框定位及aviator款式时提议 |
 | `night driving sunglasses` | 依商品用途、页面证据和投放策略确认 |
 | `night driving glasses` | 依产品类型和适用性确认 |
 | `night vision glasses` | 需核对品类、功能表述与投放策略 |
 
-本库来源包含历史项目及用户本轮新增词，不意味着本轮使用了全部候选。尤其不要把`sun glassesfor women`的错误拼写偷偷改正或将其自动设为0级。
+本库来源包含历史项目及用户新增词，已纳入用户提供的黑色偏光大框飞行员太阳镜案例中的核心泛词候选。后续逐项按当前本品/子体条件筛选：通用称呼按类目和定位提议，带限定的候选须符合自身全部条件。未知条件先归入集中提问，已知不符的候选不提议加入。尤其不要把`sun glassesfor women`的错误拼写偷偷改正或将其自动设为0级。
 
 来源也包括用户从优麦云等后台导出的有销售额词。先确认是本品、店铺还是其他商品数据及时间范围，再纳入候选；不将整条长尾出单词直接当成0级核心。完整核心的women sunglasses / sunglasses for women等语义与词序变化**不改变级别**；仅核心外独立限定加级。**核心匹配、级别等价与投放去重是两件事**：06只对不含其他限定的已确认同一裸核心合并单复数、所有格及明确的`for women`写法，含核心外限定时通常保留调序、单复数及不同写法，但06单独允许同序、同属性、同修饰对象、仅目标人群前可省`for`不同的表达合并，例如`cat eye sunglasses adult women`与`cat eye sunglasses for adult women`；不把核心匹配的等价规则用于01提前删除。同一条命中多个已确认核心泛词时，只选一个覆盖原文限定最多的完整核心，不拼接多个核心。覆盖相同时可优先采用该行核心词列（如CoreTerm）里已确认且确实匹配的核心。所选核心已包含的同一属性在句中重复出现时不再加级；同字修饰不同对象时仍分别判断。例如已确认 oval sunglasses 和 women's sunglasses，oval sunglasses for women 只选一个核心，剩下的 for women 或 oval 计1级。对于复合人群`for women with wide faces`，若所选核心仅为`sunglasses`，它可整体计1个目标人群限定；若所选核心已含women，则只计尚未覆盖的wide faces，不能把核心内women再计一次。`lightweight sunglasses for women`所选核心若是已确认的women sunglasses则仅lightweight计1项；若核心仅sunglasses则lightweight及for women计2项。形容词加名词应按修饰关系判断完整语义单元，functional nose pads算一项，adjustable silicone nose pads的调节与材质两项可独立成立则算两项。已选 oval sunglasses 时，oval oval sunglasses 不加级；oval sunglasses for oval faces 的 oval faces 是脸型适配，仍计1级。销售表现保留为依据，不能被跨来源去重吞掉，也不能将来源混同为AI拓词频次。
 
