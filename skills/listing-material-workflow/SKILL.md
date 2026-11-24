@@ -108,7 +108,7 @@ How do I clean these sunglasses?没有额外商品限定，为0级；清洁是�
 
 non-polarized/non polarized、anti-glare/anti glare、non-slip/non slip分别识别为同一完整属性，保留否定；titanium metal frame的同一材质父子项只计一次，描述整副眼镜重量的轻量与金属镜框规格分别计数；鼻托、铰链等附属部件的完整规格仍按前述规则整体计1项。区分镜框形状与适配脸型、框色与镜片色、自带度数与套戴兼容性；heart-shaped face不是心形镜框，prescription不能触词即删。
 
-**属性与实质条件分别计数**：属性之外又明确提出适配对象、结果要求，或上位场景之外列出具体活动时，分别计数，不因关联、因果或举例关系而合并。例如`small enough for a narrow face`为`small enough + for a narrow face`（2项）；`durable enough to not break easily`为`durable enough + to not break easily`（2项）；`outdoor activities like hiking`为`outdoor activities + like hiking`（2项）。enough、for、like等连接形式本身不计数，只计它们引出的实质条件；`small size`、`suitable for a narrow face`仍各1项。鼻托、铰链完整规格内部的材质/调节等修饰仍按附属部件规则整体计1项，规格之外的适配对象或结果要求另计。
+**评价/程度限定与目标条件分别计数**：`suitable`本身按1项适用性评价计数，与`small enough`、`durable enough`类似；其完整适配对象、使用场景或结果条件另计。例如`suitable + for a narrow face`、`small enough + for a narrow face`、`durable enough + to not break easily`均为2项。`outdoor activities like hiking`整体是1个完整场景，不能拆成outdoor activities和hiking重复计数；另加shopping等独立活动才增加1项。因此`suitable + for outdoor activities like hiking`为2项，再加shopping为3项。for、to、like等连接形式本身不计数；本行核心已覆盖的对象信息不重复计。计级的suitable须保留在Modifiers和投放A列，长问提炼也不能把它当作提问外壳删掉；Are、Do等助动词仍不计级。鼻托、铰链完整规格继续按已确认附属部件口径处理。
 
 ## 06去重标准：属性内部等价与核心前后位置
 
