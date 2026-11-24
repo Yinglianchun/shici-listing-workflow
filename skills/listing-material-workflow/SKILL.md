@@ -118,9 +118,9 @@ non-polarized/non polarized、anti-glare/anti glare、non-slip/non slip分别识
 - **保留边界**：`red frame blue lenses`与`blue frame red lenses`虽单词集合相同，但颜色修饰对象变了，必须分别保留。`retro`与`vintage`等普通同义替换不能自动合并。不能把多个已确认核心自由拼接后冒充同一核心。无法确定属性内部顺序交换是否无损时，默认保留两条。
 - **执行**：01仍只处理机械规范化后完全相同的原句；04只标候选；新增规则只在06按完整原文逐对核验。去重时直接选择一条**原始完整表达**为代表，禁止LLM用` | `拼接两问或擅自改写；被合并变体与来源留在步骤备份的原文追溯和合并映射中，不作为最终展示Sheet。完整原问仍供QA使用。已确认裸核心的等价写法仍可在同类型同范围内归并，但不能借此把**有独立属性**的前后位置变化抹掉。
 
-**用户确认的适用性表达去重例外**：06将`good for xxx`与`enough for xxx`视为可合并的同一适用性表达，前提是xxx所指对象/场景相同，完整核心、属性相对核心的前后位置、其他属性、否定、数值及条件均一致；此项不受“普通同义改写不能自动合并”的限制。例如`sunglasses good for daily wear`与`sunglasses enough for daily wear`可合并，选一条原始完整表达为代表，保留全部原问、变体及来源供QA覆盖核验。`small enough for xxx`、`durable enough for xxx`等含具体尺寸、耐用性或其他实质属性的表达，仍须保留这些属性，不因出现`enough for`就与`good for`合并。01仍不提前合并。
+**抽象适用性评价可等价去重，具体属性必须保留**：06比较`good for xxx`、`enough for xxx`、`suitable for xxx`及其他仅表达相同适用性评价的写法时，若评价词不包含尺寸、耐用性、舒适性等具体属性，且xxx对象/场景、完整核心、属性相对核心的位置、其他属性、否定、数值及条件均相同，可视为重复合并；不只限于列举的三个词，也不将所有形容词一律视为等价。例如`sunglasses good for daily wear`、`sunglasses enough for daily wear`与`sunglasses suitable for daily wear`可合并。`small enough for narrow face`包含具体的`small`及`for narrow face`；以`sunglasses`为核心且两者均在核心外时，Modifiers写`small enough + for narrow face`，计2项，不能与仅有抽象评价的`good for narrow face`合并。`durable enough`等同理，保留具体属性，不另把enough拆成一项。选一条原始完整表达为代表，保留全部原问、变体及来源供QA覆盖核验；01仍不提前合并。
 
-**问句去重与输出顺序**：先对完整原问按上述规则识别重复并选定代表，再计算代表原问的80字符/10词门槛并分别制作投放A列和描述F列；生成表达后再核查是否出现新增的完全重复，不能把两个原问拼在一格。A/E/F各自只填一条表达，被合并原问及来源留在步骤备份的原文追溯与映射中。尤其不能把仅有普通同义替换（如`good for driving` / `suitable for driving`）视为当然可合并；应先确认是否符合属性内部无损变体条件。导出前只检查残留拼接或重复，不再重新发明去重规则。
+**问句去重与输出顺序**：先对完整原问按上述规则识别重复并选定代表，再计算代表原问的80字符/10词门槛并分别制作投放A列和描述F列；生成表达后再核查是否出现新增的完全重复，不能把两个原问拼在一格。A/E/F各自只填一条表达，被合并原问及来源留在步骤备份的原文追溯与映射中。`good for driving`与`suitable for driving`按上述抽象适用性评价规则核验，条件一致时可合并；包含具体属性的表达仍按完整属性核对。导出前只检查残留拼接或重复，不再重新发明去重规则。
 
 
 ## 最终分级工作簿精简与待确认归并
