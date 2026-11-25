@@ -108,7 +108,7 @@ def process(rows,mode,brands=None):
             question_length=len(str(original_question or text).strip()) if is_unprocessed_question else 0
             if is_unprocessed_question and question_length>=80:
                 pending.append({'row':index,'original':source,
-                    'reason':'原问句不少于80字符，须由06提炼投放关键表达并另填描述用清洗表达'});continue
+                    'reason':'原问句不少于80字符，须由06提炼投放关键表达并另填自然表达投放候选'});continue
             cleaned,reason=ad_text(text,short_question=(is_unprocessed_question and question_length<80))
             if cleaned is None:
                 pending.append({'row':index,'original':source,'reason':reason});continue
